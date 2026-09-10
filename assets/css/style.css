@@ -2649,3 +2649,412 @@ button {
     font-size: 0.82rem !important;
     font-weight: 500 !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * § FILTROS DE DATA SEPARADOS (Início e Fim independentes)
+ * ───────────────────────────────────────────────────────────── */
+.planner-date-range {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--planner-surface);
+    border: 1px solid var(--planner-border);
+    border-radius: var(--planner-radius-sm);
+    padding: 0.3rem 0.6rem;
+    height: 38px;
+    transition: border-color var(--planner-t);
+}
+
+.planner-date-range:focus-within {
+    border-color: var(--planner-primary);
+    box-shadow: 0 0 0 2px var(--planner-primary-glow);
+}
+
+.planner-date-range__tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--planner-primary);
+    white-space: nowrap;
+    text-transform: uppercase;
+    line-height: 1;
+}
+
+.planner-date-range__input {
+    border: none;
+    background: transparent;
+    color: var(--planner-text);
+    font-size: 0.82rem;
+    font-family: inherit;
+    outline: none;
+    padding: 0;
+    width: 130px;
+    cursor: pointer;
+}
+
+.planner-date-range__input::-webkit-calendar-picker-indicator {
+    opacity: 0.4;
+    cursor: pointer;
+    filter: none;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+}
+
+/* Seta separadora entre os campos de data */
+.planner-date-sep {
+    font-size: 0.85rem;
+    color: var(--planner-text-muted);
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * § MINHAS TAREFAS — LAYOUT DE CARDS (grid premium)
+ * ───────────────────────────────────────────────────────────── */
+.planner-minhas {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem;
+}
+
+.planner-minhas__header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--planner-border);
+}
+
+.planner-minhas__title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--planner-text);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.planner-minhas__subtitle {
+    font-size: 0.85rem;
+    color: var(--planner-text-3);
+    margin: 0.15rem 0 0;
+}
+
+/* Grid responsivo de cards */
+.planner-minhas__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+/* Card individual */
+.planner-minhas__card {
+    background: var(--planner-surface);
+    border: 1px solid var(--planner-border);
+    border-radius: var(--planner-radius-lg);
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    cursor: pointer;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.planner-minhas__card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: var(--planner-radius-lg) var(--planner-radius-lg) 0 0;
+    background: var(--planner-border);
+    transition: background 0.18s ease;
+}
+
+.planner-minhas__card.priority-urgente::before { background: var(--prio-urgente); }
+.planner-minhas__card.priority-alta::before    { background: var(--prio-alta); }
+.planner-minhas__card.priority-media::before   { background: var(--prio-media); }
+.planner-minhas__card.priority-baixa::before   { background: var(--prio-baixa); }
+
+.planner-minhas__card:hover {
+    border-color: var(--planner-border-hover);
+    box-shadow: var(--planner-shadow-pop);
+    transform: translateY(-2px);
+}
+
+/* Topo do card: badge de prioridade + badge de coluna */
+.planner-minhas__card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+/* Badge da coluna (ex: "Em andamento") */
+.planner-minhas__col-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 100px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+    opacity: 0.85;
+    letter-spacing: 0.02em;
+}
+
+/* Título clicável do card */
+.planner-minhas__card-title {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--planner-text);
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.4;
+    transition: color var(--planner-t);
+}
+
+.planner-minhas__card-title:hover {
+    color: var(--planner-primary);
+}
+
+/* Descrição truncada */
+.planner-minhas__card-desc {
+    font-size: 0.78rem;
+    color: var(--planner-text-3);
+    line-height: 1.5;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Rodapé do card: prazo + comentários */
+.planner-minhas__card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--planner-border);
+    margin-top: auto;
+}
+
+/* Estado vazio da visão */
+.planner-minhas__empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem 1rem;
+    color: var(--planner-text-3);
+    text-align: center;
+}
+
+.planner-minhas__empty-icon {
+    font-size: 2.5rem;
+    opacity: 0.35;
+    color: var(--planner-primary);
+}
+
+/* =============================================================================
+   § 18 · ACORDEONS DE ATRIBUIÇÃO (EQUIPES / RESPONSÁVEIS / PESSOAS SOLTAS)
+   ============================================================================= */
+
+.planner-accordion-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.planner-accordion {
+    border: 1px solid var(--planner-border);
+    border-radius: var(--planner-radius-sm);
+    background: var(--planner-surface-2);
+    overflow: hidden;
+    transition: border-color var(--planner-t), box-shadow var(--planner-t);
+}
+
+.planner-accordion:hover {
+    border-color: var(--planner-border-hover);
+}
+
+.planner-accordion.is-open {
+    border-color: rgba(5, 150, 105, 0.4);
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.15);
+}
+
+.planner-accordion__header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    color: var(--planner-text);
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: background var(--planner-t);
+}
+
+.planner-accordion__header:hover {
+    background: var(--planner-surface-3);
+}
+
+.planner-accordion__title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.planner-accordion__icon {
+    font-size: 1rem;
+}
+
+.planner-accordion__title {
+    color: var(--planner-text);
+}
+
+.planner-accordion__badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: var(--planner-emerald);
+    color: #fff;
+    line-height: 1.2;
+}
+
+.planner-accordion__summary {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--planner-text-2);
+    padding: 0 0.5rem;
+}
+
+.planner-accordion__summary .badge-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--planner-text);
+    margin-left: 3px;
+}
+
+.planner-accordion__chevron {
+    font-size: 0.8rem;
+    color: var(--planner-text-3);
+    transition: transform var(--planner-t);
+    flex-shrink: 0;
+}
+
+.planner-accordion.is-open .planner-accordion__chevron {
+    transform: rotate(180deg);
+}
+
+.planner-accordion__content {
+    padding: 0.85rem 1rem 1rem 1rem;
+    border-top: 1px solid var(--planner-border);
+    background: var(--planner-surface);
+}
+
+/* Badge de Pessoas Soltas (Grupo Avulso) nos Cards e Tabelas */
+.task-card__pessoas-soltas {
+    margin-top: 3px;
+}
+
+.task-card__ps-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Badges interativas com botão de excluir direto no modal de detalhes */
+.planner-removable-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--planner-surface-2);
+    border: 1px solid var(--planner-border);
+    color: var(--planner-text);
+    transition: all var(--planner-t);
+}
+
+.planner-removable-badge:hover {
+    border-color: var(--planner-border-hover);
+    background: var(--planner-surface-3);
+}
+
+.planner-removable-badge--team {
+    border-color: rgba(250, 204, 21, 0.35);
+    background: rgba(250, 204, 21, 0.08);
+    color: var(--planner-gold);
+}
+
+.planner-removable-badge--ps {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: rgba(16, 185, 129, 0.08);
+    color: var(--planner-emerald);
+}
+
+.planner-removable-badge--resp {
+    border-color: rgba(99, 102, 241, 0.35);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.planner-removable-badge__del {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    color: var(--planner-text-3);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    line-height: 1;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    transition: color var(--planner-t), background var(--planner-t);
+}
+
+.planner-removable-badge__del:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+}

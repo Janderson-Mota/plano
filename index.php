@@ -2,17 +2,13 @@
 /**
  * Planner - Gestão Visual de Tarefas, Equipes e Calendário
  */
-declare(strict_types=1);
 require_once __DIR__ . '/functions.php';
-
 
 $usuarioAtual = $usuarioAtual ?? plannerGetUsuarioAtual();
 
 // Estado dos filtros
 $viewsValidas = ['kanban', 'calendario', 'dashboard', 'lista', 'minhas-tarefas'];
-$viewAtual = in_array($_GET['view'] ?? 'kanban', $viewsValidas, true)
-    ? ($_GET['view'] ?? 'kanban')
-    : 'kanban';
+$viewAtual = in_array($_GET['view'] ?? 'kanban', $viewsValidas, true) ? ($_GET['view'] ?? 'kanban') : 'kanban';
 
 $filtros = [
     'view' => $viewAtual,
@@ -126,15 +122,10 @@ $plannerData = json_encode([
             <aside class="planner-floating-nav" id="planner-floating-nav" role="navigation" aria-label="Menu principal">
 
                 <div class="planner-floating-nav__actions">
-                    <button type="button" class="planner-btn-gold w-100 mb-2" id="btnNovaTarefa" data-bs-toggle="modal"
+                    <button type="button" class="planner-btn-gold w-100" id="btnNovaTarefa" data-bs-toggle="modal"
                         data-bs-target="#planner-modal-nova-tarefa" title="Criar nova tarefa">
                         <i class="bi bi-plus-lg" aria-hidden="true"></i>
                         <span>Nova tarefa</span>
-                    </button>
-                    <button type="button" class="planner-btn-team w-100" id="btnNovaEquipe" data-bs-toggle="modal"
-                        data-bs-target="#planner-modal-nova-equipe" title="Criar nova equipe">
-                        <i class="bi bi-people" aria-hidden="true"></i>
-                        <span>Nova equipe</span>
                     </button>
                 </div>
 
@@ -292,43 +283,36 @@ $plannerData = json_encode([
                             </div>
                         </div>
 
-                        <!-- 5. Filtro de Data: Data Início e Data Fim -->
-                        <div class="planner-date-range" title="Filtrar por intervalo de prazo">
-                            <div class="planner-date-range__field">
-                                <span class="planner-date-range__tag">Início</span>
-                                <input type="date" id="filtroDataInicio" class="planner-date-range__input"
-                                    aria-label="Data Início" title="Data Início"
-                                    value="<?= htmlspecialchars($filtros['data_inicio']) ?>">
-                            </div>
-                            <span class="planner-date-range__divider" aria-hidden="true">→</span>
-                            <div class="planner-date-range__field">
-                                <span class="planner-date-range__tag">Fim</span>
-                                <input type="date" id="filtroDataFim" class="planner-date-range__input"
-                                    aria-label="Data Fim" title="Data Fim"
-                                    value="<?= htmlspecialchars($filtros['data_fim']) ?>">
-                            </div>
+                        <!-- 5. Filtro de Data: Data Início -->
+                        <div class="planner-date-range planner-date-range--inicio">
+                            <label for="filtroDataInicio" class="planner-date-range__tag">INÍCIO</label>
+                            <input type="date" id="filtroDataInicio" class="planner-date-range__input"
+                                aria-label="Data Início" title="Data Início"
+                                value="<?= htmlspecialchars($filtros['data_inicio']) ?>">
                         </div>
 
-                        <!-- 6. Botão Limpar -->
+                        <!-- Seta separadora -->
+                        <span class="planner-date-sep" aria-hidden="true">→</span>
+
+                        <!-- 6. Filtro de Data: Data Fim -->
+                        <div class="planner-date-range planner-date-range--fim">
+                            <label for="filtroDataFim" class="planner-date-range__tag">FIM</label>
+                            <input type="date" id="filtroDataFim" class="planner-date-range__input"
+                                aria-label="Data Fim" title="Data Fim"
+                                value="<?= htmlspecialchars($filtros['data_fim']) ?>">
+                        </div>
+
+                        <!-- 7. Botão Limpar -->
                         <button type="button" class="planner-filtros__clear" id="btnLimparFiltros"
                             aria-label="Limpar todos os filtros" title="Limpar todos os filtros">
                             <i class="bi bi-x-circle" aria-hidden="true"></i>
                             <span class="d-none d-xl-inline">Limpar</span>
                         </button>
 
-                        <!-- Spotlight quick action -->
-                        <button type="button" class="planner-btn-icon ms-auto" id="btnSpotlight"
-                            aria-label="Busca global (Ctrl+K)" title="Busca global (Ctrl+K)">
-                            <i class="bi bi-search" aria-hidden="true"></i>
-                            <kbd class="planner-kbd d-none d-lg-inline">Ctrl K</kbd>
-                        </button>
-
-                    </div><!-- /#planner-filtros -->
-                </div><!-- /.planner-floating-filters-wrapper -->
-
+                    </div>
+                </div>
 
                 <main class="planner-main" id="planner-main">
-
 
                     <section id="planner-board" data-view="kanban"
                         class="planner-view <?= $viewAtual === 'kanban' ? 'is-active' : '' ?>"
@@ -406,6 +390,14 @@ $plannerData = json_encode([
                                                     </div>
                                                 <?php endif; ?>
 
+                                                <?php if (!empty($tarefa['pessoas_soltas'])): ?>
+                                                    <div class="task-card__pessoas-soltas">
+                                                        <span class="task-card__ps-badge" title="Grupo avulso (pessoas soltas)">
+                                                            <i class="bi bi-people" aria-hidden="true"></i> Grupo avulso (<?= count($tarefa['pessoas_soltas']) ?>)
+                                                        </span>
+                                                    </div>
+                                                <?php endif; ?>
+
                                                 <?php if (!empty($tarefa['descricao'])): ?>
                                                     <p class="task-card__desc"><?= htmlspecialchars($tarefa['descricao']) ?></p>
                                                 <?php endif; ?>
@@ -440,7 +432,6 @@ $plannerData = json_encode([
                             <?php endforeach; ?>
                         </div><!-- /.planner-board__inner -->
                     </section>
-
 
                     <section data-view="calendario"
                         class="planner-view <?= $viewAtual === 'calendario' ? 'is-active' : '' ?>"
@@ -515,7 +506,6 @@ $plannerData = json_encode([
                             </div>
                         </div>
                     </section>
-
 
                     <section data-view="dashboard"
                         class="planner-view <?= $viewAtual === 'dashboard' ? 'is-active' : '' ?>"
@@ -595,7 +585,6 @@ $plannerData = json_encode([
                         </div>
                     </section>
 
-
                     <section data-view="lista" class="planner-view <?= $viewAtual === 'lista' ? 'is-active' : '' ?>"
                         aria-label="Lista de tarefas">
 
@@ -670,6 +659,13 @@ $plannerData = json_encode([
                                                 </td>
                                                 <td class="planner-table__td">
                                                     <?= plannerRenderAvatarStack($usuarios, $tarefa['responsaveis']) ?>
+                                                    <?php if (!empty($tarefa['pessoas_soltas'])): ?>
+                                                        <div class="mt-1" title="Pessoas soltas (grupo avulso)">
+                                                            <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle" style="font-size:0.7rem;">
+                                                                <i class="bi bi-people"></i> <?= count($tarefa['pessoas_soltas']) ?> avulso(s)
+                                                            </span>
+                                                        </div>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="planner-table__td planner-table__td--actions">
                                                     <button type="button" class="planner-btn-icon-sm" data-action="detalhe"
@@ -700,81 +696,91 @@ $plannerData = json_encode([
                         </div>
                     </section>
 
-
                     <section data-view="minhas-tarefas"
                         class="planner-view <?= $viewAtual === 'minhas-tarefas' ? 'is-active' : '' ?>"
-                        aria-label="Minhas tarefas">
+                        aria-label="Minhas tarefas" id="viewMinhasTarefas">
 
                         <div class="planner-minhas">
+
+                            <!-- Cabeçalho do usuário -->
                             <div class="planner-minhas__header">
                                 <?= plannerRenderAvatar($usuarioAtual, 'lg') ?>
                                 <div>
                                     <h2 class="planner-minhas__title">
                                         Olá, <?= htmlspecialchars(explode(' ', $usuarioAtual['nome'])[0]) ?>
                                     </h2>
-                                    <p class="planner-minhas__subtitle">
+                                    <p class="planner-minhas__subtitle" id="minhasSubtitle">
                                         <?= count($minhasTarefas) ?> tarefa(s) atribuída(s) a você
                                     </p>
                                 </div>
                             </div>
 
-                            <?php
-                            $ordemPrio = ['urgente', 'alta', 'media', 'baixa'];
-                            $algumGrupo = false;
-                            foreach ($ordemPrio as $prio):
-                                $grupo = array_values(array_filter($minhasTarefas, fn($t) => $t['prioridade'] === $prio));
-                                if (count($grupo) === 0)
-                                    continue;
-                                $algumGrupo = true;
-                                $pm = plannerPriorityMeta($prio);
-                                ?>
-                                <div class="planner-minhas__group">
-                                    <h3 class="planner-minhas__group-title">
-                                        <span
-                                            class="task-card__badge badge-<?= $pm['classe'] ?>"><?= $pm['rotulo'] ?></span>
-                                        <span class="planner-minhas__group-count"><?= count($grupo) ?></span>
-                                    </h3>
-                                    <div class="planner-minhas__cards">
-                                        <?php foreach ($grupo as $tarefa):
-                                            $sp = $tarefa['status_prazo'];
-                                            $col = $colunasMapa[$tarefa['coluna_id']] ?? null;
-                                            ?>
-                                            <article class="task-card task-card--compact <?= $pm['classe'] ?>"
-                                                data-task-id="<?= (int) $tarefa['id'] ?>">
-                                                <span class="planner-status-dot"
-                                                    style="background:<?= htmlspecialchars($col['cor'] ?? '#94A3B8') ?>"
-                                                    title="<?= htmlspecialchars($col['titulo'] ?? '') ?>"></span>
-                                                <div class="task-card__compact-body">
-                                                    <button type="button" class="task-card__title-btn" data-action="detalhe"
-                                                        data-task-id="<?= (int) $tarefa['id'] ?>">
-                                                        <?= htmlspecialchars($tarefa['titulo']) ?>
-                                                    </button>
-                                                    <span
-                                                        class="task-card__date <?= in_array($sp, ['atrasada', 'hoje'], true) ? 'is-' . $sp : '' ?>">
-                                                        <i class="bi bi-calendar-event" aria-hidden="true"></i>
-                                                        <?= plannerFormatDateShort($tarefa['prazo']) ?>
-                                                    </span>
-                                                </div>
-                                            </article>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
+                            <!-- Grid de cards -->
+                            <div class="planner-minhas__grid" id="minhasGrid">
+                                <?php foreach ($minhasTarefas as $tarefa):
+                                    $pm  = plannerPriorityMeta($tarefa['prioridade']);
+                                    $sp  = $tarefa['status_prazo'];
+                                    $col = $colunasMapa[$tarefa['coluna_id']] ?? null;
+                                    $totalComMinhas = count(array_filter(
+                                        $comentarios,
+                                        fn($c) => $c['tarefa_id'] === $tarefa['id']
+                                    ));
+                                    ?>
+                                    <article class="planner-minhas__card <?= $pm['classe'] ?> sp-<?= $sp ?>"
+                                        data-task-id="<?= (int) $tarefa['id'] ?>"
+                                        data-priority="<?= htmlspecialchars($tarefa['prioridade']) ?>"
+                                        data-assignees="<?= htmlspecialchars(implode(',', $tarefa['responsaveis'])) ?>">
 
-                            <?php if (!$algumGrupo): ?>
-                                <div class="planner-minhas__empty">
-                                    <i class="bi bi-check2-all planner-minhas__empty-icon" aria-hidden="true"></i>
-                                    <p>Nenhuma tarefa atribuída a você no momento.</p>
-                                </div>
-                            <?php endif; ?>
+                                        <!-- Topo do card: prioridade + status -->
+                                        <div class="planner-minhas__card-top">
+                                            <span class="task-card__badge badge-<?= $pm['classe'] ?>"><?= $pm['rotulo'] ?></span>
+                                            <span class="planner-minhas__col-badge"
+                                                style="border-color: <?= htmlspecialchars($col['cor'] ?? '#94A3B8') ?>; color: <?= htmlspecialchars($col['cor'] ?? '#94A3B8') ?>">
+                                                <?= htmlspecialchars($col['titulo'] ?? $tarefa['coluna_id']) ?>
+                                            </span>
+                                        </div>
+
+                                        <!-- Título -->
+                                        <button type="button" class="planner-minhas__card-title" data-action="detalhe"
+                                            data-task-id="<?= (int) $tarefa['id'] ?>">
+                                            <?= htmlspecialchars($tarefa['titulo']) ?>
+                                        </button>
+
+                                        <!-- Descrição (se houver) -->
+                                        <?php if (!empty($tarefa['descricao'])): ?>
+                                            <p class="planner-minhas__card-desc"><?= htmlspecialchars(mb_substr($tarefa['descricao'], 0, 100)) ?><?= strlen($tarefa['descricao']) > 100 ? '…' : '' ?></p>
+                                        <?php endif; ?>
+
+                                        <!-- Rodapé: prazo + comentários -->
+                                        <footer class="planner-minhas__card-footer">
+                                            <span class="task-card__date <?= in_array($sp, ['atrasada', 'hoje'], true) ? 'is-' . $sp : '' ?>">
+                                                <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                                                <?= plannerFormatDateShort($tarefa['prazo']) ?>
+                                            </span>
+                                            <?php if ($totalComMinhas > 0): ?>
+                                                <span class="task-card__comments">
+                                                    <i class="bi bi-chat" aria-hidden="true"></i><?= $totalComMinhas ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </footer>
+                                    </article>
+                                <?php endforeach; ?>
+
+                                <?php if (count($minhasTarefas) === 0): ?>
+                                    <div class="planner-minhas__empty" id="minhasEmpty">
+                                        <i class="bi bi-check2-all planner-minhas__empty-icon" aria-hidden="true"></i>
+                                        <p>Nenhuma tarefa atribuída a você no momento.</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
                         </div>
                     </section>
 
-                </main><!-- /#planner-main -->
-
-            </div><!-- /.planner-main-wrapper -->
-        </div><!-- /.planner-app-layout -->
-    </div><!-- /.planner-module-container -->
+                </main>
+            </div>
+        </div>
+    </div>
 
 
     <div id="planner-mover-menu" class="planner-move-menu" role="menu" aria-labelledby="plannerMoverMenuLabel"
@@ -825,14 +831,47 @@ $plannerData = json_encode([
                         <p id="plannerModalDesc" class="planner-modal__desc text-muted">—</p>
                     </section>
 
+                    <!-- Equipes vinculadas (editável) -->
+                    <section class="planner-modal__section">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <h3 class="planner-modal__section-title mb-0">Equipes vinculadas</h3>
+                        </div>
+                        <div class="planner-modal__teams d-flex flex-wrap gap-1 mt-1" id="plannerModalEquipes"></div>
+                        <button type="button" class="planner-btn-ghost planner-btn-ghost--sm mt-2"
+                            id="btnEditarEquipes">
+                            <i class="bi bi-briefcase" aria-hidden="true"></i>
+                            Editar equipes
+                        </button>
+                        <div class="planner-assignee-picker" id="plannerEquipesPicker" hidden role="group"
+                            aria-label="Selecionar equipes vinculadas">
+                            <div class="planner-teams-picker mb-2">
+                                <?php foreach ($equipes as $eq): ?>
+                                    <label class="planner-team-option" data-team-id="<?= (int) $eq['id'] ?>">
+                                        <input type="checkbox" name="eq_picker[]" value="<?= (int) $eq['id'] ?>">
+                                        <span><?= htmlspecialchars($eq['nome']) ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="planner-assignee-picker__footer">
+                                <button type="button" class="btn btn-sm btn-primary" id="btnSalvarEquipes">
+                                    Salvar equipes
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    id="btnCancelarEquipes">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
                     <!-- Responsáveis ad-hoc (editável) -->
                     <section class="planner-modal__section">
-                        <h3 class="planner-modal__section-title">Responsáveis do grupo</h3>
+                        <h3 class="planner-modal__section-title">Responsáveis formais</h3>
                         <div class="planner-modal__assignees" id="plannerModalAssignees"></div>
                         <button type="button" class="planner-btn-ghost planner-btn-ghost--sm mt-2"
                             id="btnEditarResponsaveis">
                             <i class="bi bi-person-plus" aria-hidden="true"></i>
-                            Editar grupo
+                            Editar responsáveis
                         </button>
                         <div class="planner-assignee-picker" id="plannerAssigneePicker" hidden role="group"
                             aria-label="Selecionar responsáveis">
@@ -847,10 +886,42 @@ $plannerData = json_encode([
                             <?php endforeach; ?>
                             <div class="planner-assignee-picker__footer">
                                 <button type="button" class="btn btn-sm btn-primary" id="btnSalvarResponsaveis">
-                                    Salvar grupo
+                                    Salvar responsáveis
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                     id="btnCancelarResponsaveis">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Pessoas Soltas / Grupo Avulso (editável) -->
+                    <section class="planner-modal__section">
+                        <h3 class="planner-modal__section-title">Pessoas Soltas (Grupo Avulso)</h3>
+                        <div class="planner-modal__assignees" id="plannerModalPessoasSoltas"></div>
+                        <button type="button" class="planner-btn-ghost planner-btn-ghost--sm mt-2"
+                            id="btnEditarPessoasSoltas">
+                            <i class="bi bi-people" aria-hidden="true"></i>
+                            Editar grupo avulso
+                        </button>
+                        <div class="planner-assignee-picker" id="plannerPessoasSoltasPicker" hidden role="group"
+                            aria-label="Selecionar pessoas soltas para grupo avulso">
+                            <?php foreach ($usuarios as $u): ?>
+                                <label class="planner-assignee-option">
+                                    <input type="checkbox" name="ps_picker[]" value="<?= (int) $u['id'] ?>"
+                                        class="visually-hidden">
+                                    <?= plannerRenderAvatar($u, 'sm') ?>
+                                    <span class="planner-assignee-option__nome"><?= htmlspecialchars($u['nome']) ?></span>
+                                    <span class="planner-assignee-option__cargo"><?= htmlspecialchars($u['cargo']) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                            <div class="planner-assignee-picker__footer">
+                                <button type="button" class="btn btn-sm btn-primary" id="btnSalvarPessoasSoltas">
+                                    Salvar grupo avulso
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    id="btnCancelarPessoasSoltas">
                                     Cancelar
                                 </button>
                             </div>
@@ -960,39 +1031,98 @@ $plannerData = json_encode([
                         <input type="date" class="form-control" id="novaTarefaPrazo" name="prazo">
                     </div>
 
-                    <div class="mb-3">
-                        <div class="d-flex align-items-center justify-content-between mb-1">
-                            <span class="form-label mb-0">Equipes</span>
-                            <button type="button" class="btn btn-sm btn-link text-warning p-0 text-decoration-none"
-                                data-bs-toggle="modal" data-bs-target="#planner-modal-nova-equipe"
-                                style="font-size: 0.78rem;">+ Nova equipe</button>
-                        </div>
-                        <div class="planner-teams-picker" id="novaTarefaTeamsPicker" role="group"
-                            aria-label="Equipes responsáveis">
-                            <?php foreach ($equipes as $eq): ?>
-                                <label class="planner-team-option" data-team-id="<?= (int) $eq['id'] ?>">
-                                    <input type="checkbox" name="equipes[]" value="<?= (int) $eq['id'] ?>">
-                                    <span><?= htmlspecialchars($eq['nome']) ?></span>
-                                </label>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
+                    <!-- 3 Acordeons de Atribuição: Equipes, Responsáveis e Pessoas Soltas -->
+                    <div class="planner-accordion-group mb-3" id="novaTarefaAccordionGroup">
+                        <span class="form-label d-block mb-2">Atribuição de Executores (Selecione Equipe, Responsáveis ou Pessoas Soltas)</span>
 
-                    <div class="mb-1">
-                        <span class="form-label d-block" id="novarespLabel">
-                            Responsáveis — grupo ad-hoc
-                        </span>
-                        <div class="planner-assignee-picker" role="group" aria-labelledby="novarespLabel">
-                            <?php foreach ($usuarios as $u): ?>
-                                <label class="planner-assignee-option">
-                                    <input type="checkbox" name="responsaveis[]" value="<?= (int) $u['id'] ?>"
-                                        class="visually-hidden">
-                                    <?= plannerRenderAvatar($u, 'sm') ?>
-                                    <span class="planner-assignee-option__nome"><?= htmlspecialchars($u['nome']) ?></span>
-                                    <span class="planner-assignee-option__cargo"><?= htmlspecialchars($u['cargo']) ?></span>
-                                </label>
-                            <?php endforeach; ?>
+                        <!-- Acordeon 1: Equipes -->
+                        <div class="planner-accordion" id="accEquipes">
+                            <button type="button" class="planner-accordion__header" aria-expanded="false" aria-controls="accEquipesContent">
+                                <div class="planner-accordion__title-wrap">
+                                    <i class="bi bi-briefcase-fill text-warning planner-accordion__icon" aria-hidden="true"></i>
+                                    <span class="planner-accordion__title">Equipes</span>
+                                    <span class="planner-accordion__badge d-none" id="badgeAccEquipes">0</span>
+                                </div>
+                                <div class="planner-accordion__summary" id="summaryAccEquipes">
+                                    <span class="text-muted small">Nenhuma selecionada</span>
+                                </div>
+                                <i class="bi bi-chevron-down planner-accordion__chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="planner-accordion__content" id="accEquipesContent" hidden>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="text-muted small">Equipes cadastradas:</span>
+                                    <button type="button" class="btn btn-sm btn-link text-warning p-0 text-decoration-none"
+                                        data-bs-toggle="modal" data-bs-target="#planner-modal-nova-equipe"
+                                        style="font-size: 0.78rem;">+ Nova equipe</button>
+                                </div>
+                                <div class="planner-teams-picker" id="novaTarefaTeamsPicker" role="group" aria-label="Equipes responsáveis">
+                                    <?php foreach ($equipes as $eq): ?>
+                                        <label class="planner-team-option" data-team-id="<?= (int) $eq['id'] ?>">
+                                            <input type="checkbox" name="equipes[]" value="<?= (int) $eq['id'] ?>">
+                                            <span><?= htmlspecialchars($eq['nome']) ?></span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Acordeon 2: Responsáveis Formais -->
+                        <div class="planner-accordion" id="accResponsaveis">
+                            <button type="button" class="planner-accordion__header" aria-expanded="false" aria-controls="accResponsaveisContent">
+                                <div class="planner-accordion__title-wrap">
+                                    <i class="bi bi-person-fill text-primary planner-accordion__icon" aria-hidden="true"></i>
+                                    <span class="planner-accordion__title">Responsáveis Formais</span>
+                                    <span class="planner-accordion__badge d-none" id="badgeAccResponsaveis">0</span>
+                                </div>
+                                <div class="planner-accordion__summary" id="summaryAccResponsaveis">
+                                    <span class="text-muted small">Nenhum selecionado</span>
+                                </div>
+                                <i class="bi bi-chevron-down planner-accordion__chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="planner-accordion__content" id="accResponsaveisContent" hidden>
+                                <div class="planner-assignee-picker" role="group" aria-label="Responsáveis formais">
+                                    <?php foreach ($usuarios as $u): ?>
+                                        <label class="planner-assignee-option">
+                                            <input type="checkbox" name="responsaveis[]" value="<?= (int) $u['id'] ?>"
+                                                class="visually-hidden">
+                                            <?= plannerRenderAvatar($u, 'sm') ?>
+                                            <span class="planner-assignee-option__nome"><?= htmlspecialchars($u['nome']) ?></span>
+                                            <span class="planner-assignee-option__cargo"><?= htmlspecialchars($u['cargo']) ?></span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Acordeon 3: Pessoas Soltas (Grupo Avulso) -->
+                        <div class="planner-accordion" id="accPessoasSoltas">
+                            <button type="button" class="planner-accordion__header" aria-expanded="false" aria-controls="accPessoasSoltasContent">
+                                <div class="planner-accordion__title-wrap">
+                                    <i class="bi bi-people-fill text-success planner-accordion__icon" aria-hidden="true"></i>
+                                    <span class="planner-accordion__title">Pessoas Soltas (Grupo Avulso)</span>
+                                    <span class="planner-accordion__badge d-none" id="badgeAccPessoasSoltas">0</span>
+                                </div>
+                                <div class="planner-accordion__summary" id="summaryAccPessoasSoltas">
+                                    <span class="text-muted small">Nenhuma selecionada</span>
+                                </div>
+                                <i class="bi bi-chevron-down planner-accordion__chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="planner-accordion__content" id="accPessoasSoltasContent" hidden>
+                                <p class="text-muted small mb-2">Selecione pessoas avulsas que atuarão juntas nesta tarefa sem necessidade de formar uma equipe cadastrada.</p>
+                                <div class="planner-assignee-picker" role="group" aria-label="Pessoas soltas para grupo avulso">
+                                    <?php foreach ($usuarios as $u): ?>
+                                        <label class="planner-assignee-option">
+                                            <input type="checkbox" name="pessoas_soltas[]" value="<?= (int) $u['id'] ?>"
+                                                class="visually-hidden">
+                                            <?= plannerRenderAvatar($u, 'sm') ?>
+                                            <span class="planner-assignee-option__nome"><?= htmlspecialchars($u['nome']) ?></span>
+                                            <span class="planner-assignee-option__cargo"><?= htmlspecialchars($u['cargo']) ?></span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -1009,7 +1139,6 @@ $plannerData = json_encode([
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content planner-modal-content" id="plannerFormNovaEquipe" novalidate>
-                ">
                 <div class="modal-header">
                     <h2 class="modal-title h5 d-flex align-items-center gap-2" id="modalNovaEquipeLabel">
                         <i class="bi bi-people-fill text-warning"></i>
@@ -1082,34 +1211,7 @@ $plannerData = json_encode([
     </div>
 
 
-    <div id="planner-busca-global" class="planner-spotlight" role="dialog" aria-modal="true" aria-label="Busca global"
-        hidden>
-        <div class="planner-spotlight__backdrop" id="plannerSpotlightBackdrop"></div>
-        <div class="planner-spotlight__panel">
-            <div class="planner-spotlight__input-row">
-                <i class="bi bi-search planner-spotlight__icon" aria-hidden="true"></i>
-                <label for="plannerSpotlightInput" class="visually-hidden">Busca global</label>
-                <input type="search" id="plannerSpotlightInput" class="planner-spotlight__input"
-                    placeholder="Buscar tarefas, pessoas, equipes..." autocomplete="off" spellcheck="false"
-                    aria-autocomplete="list" aria-controls="plannerSpotlightResults" aria-activedescendant="">
-                <kbd class="planner-kbd">Esc</kbd>
-            </div>
-
-            <ul class="planner-spotlight__results" id="plannerSpotlightResults" role="listbox"
-                aria-label="Resultados da busca" aria-live="polite">
-                <li class="planner-spotlight__hint" role="option" aria-selected="false">
-                    <i class="bi bi-lightbulb" aria-hidden="true"></i>
-                    Digite para buscar tarefas, pessoas ou equipes.
-                </li>
-            </ul>
-
-            <div class="planner-spotlight__footer" aria-hidden="true">
-                <span><kbd class="planner-kbd">↑↓</kbd> navegar</span>
-                <span><kbd class="planner-kbd">Enter</kbd> selecionar</span>
-                <span><kbd class="planner-kbd">Esc</kbd> fechar</span>
-            </div>
-        </div>
-    </div>
+    <!-- Spotlight removido (Ctrl+K desativado por preferência do usuário) -->
 
 
     <script type="application/json" id="planner-data">

@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);
+
 
 /**
  * Conexão com o Banco de Dados MySQL

@@ -22,44 +22,44 @@
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', initPlanner);
+    document.addEventListener('DOMContentLoaded', inicializarPlanner);
 
-    function initPlanner() {
-        const dataEl = document.getElementById('planner-data');
-        if (!dataEl) return;
+    function inicializarPlanner() {
+        const elementoDados = document.getElementById('planner-data');
+        if (!elementoDados) return;
 
-        let initialData;
+        let dadosIniciais;
         try {
-            initialData = JSON.parse(dataEl.textContent);
+            dadosIniciais = JSON.parse(elementoDados.textContent);
         } catch (e) {
             console.error('Planner: Falha ao interpretar JSON inicial:', e);
             return;
         }
 
         // Estado reativo da aplicação
-        const state = {
-            usuarioAtual: initialData.usuarioAtual || {},
-            usuarios: initialData.usuarios || [],
-            equipes: initialData.equipes || [],
-            colunas: initialData.colunas || [],
-            tarefas: initialData.tarefas || [],
-            comentarios: initialData.comentarios || [],
-            atividades: initialData.atividades || [],
+        const estado = {
+            usuarioAtual: dadosIniciais.usuarioAtual || {},
+            usuarios: dadosIniciais.usuarios || [],
+            equipes: dadosIniciais.equipes || [],
+            colunas: dadosIniciais.colunas || [],
+            tarefas: dadosIniciais.tarefas || [],
+            comentarios: dadosIniciais.comentarios || [],
+            atividades: dadosIniciais.atividades || [],
             filtros: {
-                texto: initialData.filtros?.texto || '',
-                equipes: initialData.filtros?.equipe ? [Number(initialData.filtros.equipe)] : [],
-                responsaveis: initialData.filtros?.usuario ? [Number(initialData.filtros.usuario)] : [],
-                prioridades: initialData.filtros?.prioridade ? [initialData.filtros.prioridade] : [],
-                dataInicio: initialData.filtros?.data_inicio || '',
-                dataFim: initialData.filtros?.data_fim || '',
-                prazo: initialData.filtros?.prazo || '',
+                texto: dadosIniciais.filtros?.texto || '',
+                equipes: dadosIniciais.filtros?.equipe ? [Number(dadosIniciais.filtros.equipe)] : [],
+                responsaveis: dadosIniciais.filtros?.usuario ? [Number(dadosIniciais.filtros.usuario)] : [],
+                prioridades: dadosIniciais.filtros?.prioridade ? [dadosIniciais.filtros.prioridade] : [],
+                dataInicio: dadosIniciais.filtros?.data_inicio || '',
+                dataFim: dadosIniciais.filtros?.data_fim || '',
+                prazo: dadosIniciais.filtros?.prazo || '',
             },
-            currentView: document.documentElement.dataset.plannerView || 'kanban',
-            activeCharts: {}
+            visaoAtual: document.documentElement.dataset.plannerView || 'kanban',
+            graficosAtivos: {}
         };
 
         // Comunicação com API (POST JSON)
-        async function plannerApi(action, payload = {}) {
+        async function chamarApi(action, payload = {}) {
             try {
                 const response = await fetch('ajax/index.php', {
                     method: 'POST',
@@ -76,34 +76,34 @@
                 return result.data;
             } catch (err) {
                 console.error(`Planner API [${action}]:`, err);
-                showToast(err.message || 'Ocorreu um erro na requisição.', 'danger');
+                exibirToast(err.message || 'Ocorreu um erro na requisição.', 'danger');
                 throw err;
             }
         }
 
         // 
-        function getUsuario(id) {
-            return state.usuarios.find(u => u.id === Number(id)) || null;
+        function buscarUsuario(id) {
+            return estado.usuarios.find(u => u.id === Number(id)) || null;
         }
 
-        function getColuna(id) {
-            return state.colunas.find(c => c.id === id) || null;
+        function buscarColuna(id) {
+            return estado.colunas.find(c => c.id === id) || null;
         }
 
-        function getEquipe(id) {
-            return state.equipes.find(e => e.id === Number(id)) || null;
+        function buscarEquipe(id) {
+            return estado.equipes.find(e => e.id === Number(id)) || null;
         }
 
-        function getMembrosEquipeEFilhas(equipeId) {
+        function buscarMembrosEquipeEFilhas(equipeId) {
             const eqId = Number(equipeId);
             if (!eqId) return [];
             const resultIds = new Set();
 
             function coletar(id) {
-                const eq = getEquipe(id);
+                const eq = buscarEquipe(id);
                 if (!eq) return;
                 (eq.membros || []).forEach(m => resultIds.add(m));
-                state.equipes.filter(filha => filha.pai_id === id).forEach(filha => coletar(filha.id));
+                estado.equipes.filter(filha => filha.pai_id === id).forEach(filha => coletar(filha.id));
             }
 
             coletar(eqId);
@@ -125,7 +125,7 @@
             return 'futura';
         }
 
-        function formatRelativeTime(dateStr) {
+        function formatarTempoRelativo(dateStr) {
             if (!dateStr) return '';
             const data = new Date(dateStr.replace(' ', 'T'));
             const agora = new Date();
@@ -146,7 +146,7 @@
             return `${dia}/${mes}/${ano}`;
         }
 
-        function escapeHtml(str) {
+        function escaparHtml(str) {
             if (str === null || str === undefined) return '';
             return String(str)
                 .replace(/&/g, '&amp;')
@@ -156,7 +156,7 @@
                 .replace(/'/g, '&#039;');
         }
 
-        function showToast(mensagem, tipo = 'primary') {
+        function exibirToast(mensagem, tipo = 'primary') {
             let container = document.getElementById('plannerToastContainer');
             if (!container) {
                 container = document.createElement('div');
@@ -179,11 +179,11 @@
         }
 
         // 
-        function switchView(viewName, updateUrl = true) {
+        function trocarVisao(viewName, updateUrl = true) {
             const validViews = ['kanban', 'calendario', 'dashboard', 'lista', 'minhas-tarefas'];
             if (!validViews.includes(viewName)) viewName = 'kanban';
 
-            state.currentView = viewName;
+            estado.visaoAtual = viewName;
             document.documentElement.dataset.plannerView = viewName;
 
             // Atualiza links de navegação
@@ -201,9 +201,9 @@
 
             // Ações específicas de cada view
             if (viewName === 'dashboard') {
-                renderDashboardCharts();
+                renderizarGraficosDashboard();
             } else if (viewName === 'calendario') {
-                renderPlannerCalendar();
+                renderizarCalendario();
             }
 
             if (updateUrl) {
@@ -217,14 +217,14 @@
         document.querySelectorAll('[data-view-link]').forEach(link => {
             link.addEventListener('click', e => {
                 e.preventDefault();
-                switchView(link.dataset.viewLink);
+                trocarVisao(link.dataset.viewLink);
             });
         });
 
         window.addEventListener('popstate', () => {
             const url = new URL(window.location.href);
             const viewFromUrl = url.searchParams.get('view') || 'kanban';
-            switchView(viewFromUrl, false);
+            trocarVisao(viewFromUrl, false);
         });
 
         // 
@@ -265,7 +265,7 @@
         ];
 
         // Fechar todos os dropdowns abertos
-        function closeAllDropdowns() {
+        function fecharTodosDropdowns() {
             document.querySelectorAll('.planner-multiselect').forEach(ms => {
                 ms.classList.remove('is-open');
                 const dd = ms.querySelector('.planner-multiselect__dropdown');
@@ -291,7 +291,7 @@
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 const isOpen = container.classList.contains('is-open');
-                closeAllDropdowns();
+                fecharTodosDropdowns();
                 if (!isOpen) {
                     container.classList.add('is-open');
                     dropdown.hidden = false;
@@ -310,7 +310,7 @@
                 const currentBoxes = dropdown.querySelectorAll(`input[name="${cfg.inputName}"]`);
                 const checkedBoxes = Array.from(currentBoxes).filter(cb => cb.checked);
                 const values = checkedBoxes.map(cb => cfg.isNumber ? Number(cb.value) : cb.value);
-                state.filtros[cfg.key] = values;
+                estado.filtros[cfg.key] = values;
 
                 if (badge) {
                     if (values.length > 0) {
@@ -320,7 +320,7 @@
                         badge.classList.add('d-none');
                     }
                 }
-                syncFilters();
+                sincronizarFiltros();
             }
 
             dropdown.addEventListener('change', e => {
@@ -340,15 +340,15 @@
             }
 
             // Marca checkboxes caso já haja valores pré-selecionados
-            if (Array.isArray(state.filtros[cfg.key]) && state.filtros[cfg.key].length > 0) {
+            if (Array.isArray(estado.filtros[cfg.key]) && estado.filtros[cfg.key].length > 0) {
                 dropdown.querySelectorAll(`input[name="${cfg.inputName}"]`).forEach(cb => {
                     const val = cfg.isNumber ? Number(cb.value) : cb.value;
-                    if (state.filtros[cfg.key].includes(val)) {
+                    if (estado.filtros[cfg.key].includes(val)) {
                         cb.checked = true;
                     }
                 });
                 if (badge) {
-                    badge.textContent = String(state.filtros[cfg.key].length);
+                    badge.textContent = String(estado.filtros[cfg.key].length);
                     badge.classList.remove('d-none');
                 }
             }
@@ -356,13 +356,13 @@
 
         // Fechar dropdowns ao clicar em qualquer outra parte da página
         document.addEventListener('click', () => {
-            closeAllDropdowns();
+            fecharTodosDropdowns();
         });
 
         // Fechar com a tecla Escape
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
-                closeAllDropdowns();
+                fecharTodosDropdowns();
             }
         });
 
@@ -372,8 +372,8 @@
             filtroTexto.addEventListener('input', () => {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
-                    state.filtros.texto = filtroTexto.value.trim().toLowerCase();
-                    syncFilters();
+                    estado.filtros.texto = filtroTexto.value.trim().toLowerCase();
+                    sincronizarFiltros();
                 }, 200);
             });
         }
@@ -381,28 +381,28 @@
         // Filtro de Data Início e Fim
         if (filtroDataInicio) {
             filtroDataInicio.addEventListener('change', () => {
-                state.filtros.dataInicio = filtroDataInicio.value;
-                syncFilters();
+                estado.filtros.dataInicio = filtroDataInicio.value;
+                sincronizarFiltros();
             });
         }
 
         if (filtroDataFim) {
             filtroDataFim.addEventListener('change', () => {
-                state.filtros.dataFim = filtroDataFim.value;
-                syncFilters();
+                estado.filtros.dataFim = filtroDataFim.value;
+                sincronizarFiltros();
             });
         }
 
         // Botão Limpar Filtros Global
         if (btnLimparFiltros) {
             btnLimparFiltros.addEventListener('click', () => {
-                state.filtros.texto = '';
-                state.filtros.equipes = [];
-                state.filtros.responsaveis = [];
-                state.filtros.prioridades = [];
-                state.filtros.dataInicio = '';
-                state.filtros.dataFim = '';
-                state.filtros.prazo = '';
+                estado.filtros.texto = '';
+                estado.filtros.equipes = [];
+                estado.filtros.responsaveis = [];
+                estado.filtros.prioridades = [];
+                estado.filtros.dataInicio = '';
+                estado.filtros.dataFim = '';
+                estado.filtros.prazo = '';
 
                 if (filtroTexto) filtroTexto.value = '';
                 if (filtroDataInicio) filtroDataInicio.value = '';
@@ -420,13 +420,13 @@
                     if (badge) badge.classList.add('d-none');
                 });
 
-                closeAllDropdowns();
-                syncFilters();
+                fecharTodosDropdowns();
+                sincronizarFiltros();
             });
         }
 
-        function taskMatchesFilters(tarefa) {
-            const f = state.filtros;
+        function tarefaPassaNosFiltos(tarefa) {
+            const f = estado.filtros;
 
             // 1. Busca textual no título e descrição
             if (f.texto) {
@@ -453,7 +453,7 @@
                 const matchDirect = f.equipes.some(eqId => taskEqs.includes(eqId));
                 if (!matchDirect) {
                     // Fallback: verificar se membros da equipe estão nos responsáveis da tarefa
-                    const allowedMembers = f.equipes.flatMap(eqId => getMembrosEquipeEFilhas(eqId));
+                    const allowedMembers = f.equipes.flatMap(eqId => buscarMembrosEquipeEFilhas(eqId));
                     const taskResps = (tarefa.responsaveis || []).map(Number);
                     const matchMember = taskResps.some(r => allowedMembers.includes(r));
                     if (!matchMember) return false;
@@ -476,63 +476,83 @@
             return true;
         }
 
-        function syncFilters() {
+        function sincronizarFiltros() {
             // Sincroniza querystring
             const url = new URL(window.location.href);
-            if (state.filtros.texto) url.searchParams.set('q', state.filtros.texto);
+            if (estado.filtros.texto) url.searchParams.set('q', estado.filtros.texto);
             else url.searchParams.delete('q');
 
-            if (state.filtros.dataInicio) url.searchParams.set('data_inicio', state.filtros.dataInicio);
+            if (estado.filtros.dataInicio) url.searchParams.set('data_inicio', estado.filtros.dataInicio);
             else url.searchParams.delete('data_inicio');
 
-            if (state.filtros.dataFim) url.searchParams.set('data_fim', state.filtros.dataFim);
+            if (estado.filtros.dataFim) url.searchParams.set('data_fim', estado.filtros.dataFim);
             else url.searchParams.delete('data_fim');
 
-            if (state.filtros.equipes.length === 1) url.searchParams.set('equipe', String(state.filtros.equipes[0]));
+            if (estado.filtros.equipes.length === 1) url.searchParams.set('equipe', String(estado.filtros.equipes[0]));
             else url.searchParams.delete('equipe');
 
-            if (state.filtros.responsaveis.length === 1) url.searchParams.set('usuario', String(state.filtros.responsaveis[0]));
+            if (estado.filtros.responsaveis.length === 1) url.searchParams.set('usuario', String(estado.filtros.responsaveis[0]));
             else url.searchParams.delete('usuario');
 
-            if (state.filtros.prioridades.length === 1) url.searchParams.set('prioridade', state.filtros.prioridades[0]);
+            if (estado.filtros.prioridades.length === 1) url.searchParams.set('prioridade', estado.filtros.prioridades[0]);
             else url.searchParams.delete('prioridade');
 
-            window.history.replaceState({ view: state.currentView }, '', url);
+            window.history.replaceState({ view: estado.visaoAtual }, '', url);
 
             // Aplica na View Kanban
             const cards = document.querySelectorAll('#planner-board .task-card');
             cards.forEach(card => {
                 const id = Number(card.dataset.taskId);
-                const tarefa = state.tarefas.find(t => t.id === id);
+                const tarefa = estado.tarefas.find(t => t.id === id);
                 if (!tarefa) return;
-                const match = taskMatchesFilters(tarefa);
+                const match = tarefaPassaNosFiltos(tarefa);
                 card.style.display = match ? '' : 'none';
             });
-            updateColumnCounts();
+            atualizarContagemColunas();
 
             // Aplica na View Lista
             const rows = document.querySelectorAll('#plannerTabelaBody .planner-table__row');
             let visiveisLista = 0;
             rows.forEach(row => {
                 const id = Number(row.dataset.taskId);
-                const tarefa = state.tarefas.find(t => t.id === id);
+                const tarefa = estado.tarefas.find(t => t.id === id);
                 if (!tarefa) return;
-                const match = taskMatchesFilters(tarefa);
+                const match = tarefaPassaNosFiltos(tarefa);
                 row.style.display = match ? '' : 'none';
                 if (match) visiveisLista++;
             });
             const listaCount = document.getElementById('listaCount');
             if (listaCount) listaCount.textContent = `${visiveisLista} tarefa(s)`;
 
+            // Aplica na View Minhas Tarefas
+            const minhasCards = document.querySelectorAll('#minhasGrid .planner-minhas__card');
+            let visiveisMinhas = 0;
+            minhasCards.forEach(card => {
+                const id = Number(card.dataset.taskId);
+                // Em Minhas Tarefas, o usuário atual já é responsável;
+                // filtramos pelos outros critérios (prioridade, datas, texto)
+                const tarefa = estado.tarefas.find(t => t.id === id);
+                if (!tarefa) return;
+                const match = tarefaPassaNosFiltos(tarefa);
+                card.style.display = match ? '' : 'none';
+                if (match) visiveisMinhas++;
+            });
+            const subtituloMinhas = document.getElementById('minhasSubtitle');
+            if (subtituloMinhas) subtituloMinhas.textContent = `${visiveisMinhas} tarefa(s) atribuída(s) a você`;
+
+            // Vazio de Minhas Tarefas
+            const minhasEmpty = document.getElementById('minhasEmpty');
+            if (minhasEmpty) minhasEmpty.style.display = visiveisMinhas === 0 && minhasCards.length > 0 ? '' : 'none';
+
             // Re-renderiza dashboard ou calendário se estiver ativo
-            if (state.currentView === 'dashboard') {
-                renderDashboardCharts();
-            } else if (state.currentView === 'calendario') {
-                renderPlannerCalendar();
+            if (estado.visaoAtual === 'dashboard') {
+                renderizarGraficosDashboard();
+            } else if (estado.visaoAtual === 'calendario') {
+                renderizarCalendario();
             }
         }
 
-        function updateColumnCounts() {
+        function atualizarContagemColunas() {
             document.querySelectorAll('#planner-board .board-col').forEach(col => {
                 const colId = col.dataset.columnId;
                 const visibleCount = col.querySelectorAll(`.task-card:not([style*="display: none"])`).length;
@@ -587,20 +607,20 @@
                     // Movimentação otimista
                     colBody.appendChild(card);
                     card.dataset.column = targetCol;
-                    updateColumnCounts();
+                    atualizarContagemColunas();
 
                     try {
-                        await plannerApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
-                        const tarefa = state.tarefas.find(t => t.id === taskId);
+                        await chamarApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
+                        const tarefa = estado.tarefas.find(t => t.id === taskId);
                         if (tarefa) tarefa.coluna_id = targetCol;
-                        showToast('Tarefa movida com sucesso!', 'success');
+                        exibirToast('Tarefa movida com sucesso!', 'success');
                     } catch (err) {
                         // Reverte em caso de falha
                         const originBody = board.querySelector(`[data-column-body="${originCol}"]`);
                         if (originBody) {
                             originBody.appendChild(card);
                             card.dataset.column = originCol;
-                            updateColumnCounts();
+                            atualizarContagemColunas();
                         }
                     }
                 });
@@ -615,16 +635,16 @@
             const moverBtn = e.target.closest('[data-action="mover"]');
             if (moverBtn) {
                 e.stopPropagation();
-                openMoverMenu(moverBtn);
+                abrirMenuMover(moverBtn);
                 return;
             }
 
             if (moverMenu && !moverMenu.contains(e.target)) {
-                closeMoverMenu();
+                fecharMenuMover();
             }
         });
 
-        function openMoverMenu(btn) {
+        function abrirMenuMover(btn) {
             if (!moverMenu) return;
             const taskId = btn.dataset.taskId;
             moverMenu.dataset.taskId = taskId;
@@ -640,7 +660,7 @@
             if (firstItem) firstItem.focus();
         }
 
-        function closeMoverMenu() {
+        function fecharMenuMover() {
             if (!moverMenu) return;
             moverMenu.setAttribute('hidden', '');
             if (currentMoverBtn) {
@@ -656,7 +676,7 @@
 
                 const taskId = Number(moverMenu.dataset.taskId);
                 const targetCol = item.dataset.moveTo;
-                closeMoverMenu();
+                fecharMenuMover();
 
                 if (!taskId || !targetCol) return;
 
@@ -667,21 +687,21 @@
                 if (card && targetBody && originCol !== targetCol) {
                     targetBody.appendChild(card);
                     card.dataset.column = targetCol;
-                    updateColumnCounts();
+                    atualizarContagemColunas();
                 }
 
                 try {
-                    await plannerApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
-                    const tarefa = state.tarefas.find(t => t.id === taskId);
+                    await chamarApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
+                    const tarefa = estado.tarefas.find(t => t.id === taskId);
                     if (tarefa) tarefa.coluna_id = targetCol;
-                    showToast('Tarefa movida com sucesso!', 'success');
+                    exibirToast('Tarefa movida com sucesso!', 'success');
                 } catch (err) {
                     if (card && originCol) {
                         const originBody = document.querySelector(`[data-column-body="${originCol}"]`);
                         if (originBody) {
                             originBody.appendChild(card);
                             card.dataset.column = originCol;
-                            updateColumnCounts();
+                            atualizarContagemColunas();
                         }
                     }
                 }
@@ -701,7 +721,7 @@
                     if (prev) prev.focus();
                 } else if (e.key === 'Escape') {
                     e.preventDefault();
-                    closeMoverMenu();
+                    fecharMenuMover();
                 }
             });
         }
@@ -718,12 +738,12 @@
                                (e.target.closest('.task-card') && !e.target.closest('button'));
             if (detalheBtn) {
                 const taskId = Number(detalheBtn.dataset.taskId || detalheBtn.closest('.task-card')?.dataset.taskId);
-                if (taskId) openTaskDetail(taskId);
+                if (taskId) abrirDetalhesTarefa(taskId);
             }
         });
 
-        function openTaskDetail(taskId) {
-            const tarefa = state.tarefas.find(t => t.id === taskId);
+        function abrirDetalhesTarefa(taskId) {
+            const tarefa = estado.tarefas.find(t => t.id === taskId);
             if (!tarefa) return;
 
             const modalTitle = document.getElementById('plannerModalTarefaLabel');
@@ -742,14 +762,14 @@
                 prioBadge.textContent = tarefa.prioridade.toUpperCase();
             }
 
-            const col = getColuna(tarefa.coluna_id);
+            const col = buscarColuna(tarefa.coluna_id);
             if (colunaSpan) colunaSpan.textContent = col ? col.titulo : tarefa.coluna_id;
 
             if (prazoSpan) {
                 prazoSpan.textContent = tarefa.prazo ? `Prazo: ${tarefa.prazo}` : 'Sem prazo';
             }
 
-            const criador = getUsuario(tarefa.criado_por);
+            const criador = buscarUsuario(tarefa.criado_por);
             if (criadorSpan) {
                 criadorSpan.textContent = criador ? `Criado por ${criador.nome}` : 'Planner';
             }
@@ -762,7 +782,32 @@
             if (commentTarefaId) commentTarefaId.value = String(tarefa.id);
             if (btnMover) btnMover.dataset.taskId = String(tarefa.id);
 
-            // Renderiza avatares dos responsáveis atuais
+            // 1. Renderiza equipes vinculadas atuais
+            const equipesDiv = document.getElementById('plannerModalEquipes');
+            if (equipesDiv) {
+                equipesDiv.innerHTML = '';
+                const eqList = (tarefa.equipes || []).map(Number);
+                if (eqList.length === 0) {
+                    equipesDiv.innerHTML = '<span class="text-muted small">Nenhuma equipe vinculada.</span>';
+                } else {
+                    eqList.forEach(eqId => {
+                        const eq = buscarEquipe(eqId);
+                        if (!eq) return;
+                        const badge = document.createElement('span');
+                        badge.className = 'planner-removable-badge planner-removable-badge--team';
+                        badge.innerHTML = `
+                            <i class="bi bi-briefcase-fill" aria-hidden="true"></i>
+                            <span>${escaparHtml(eq.nome)}</span>
+                            <button type="button" class="planner-removable-badge__del" data-remove-team="${eq.id}" title="Remover equipe ${escaparHtml(eq.nome)}" aria-label="Remover">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        `;
+                        equipesDiv.appendChild(badge);
+                    });
+                }
+            }
+
+            // 2. Renderiza avatares dos responsáveis atuais
             if (assigneesDiv) {
                 assigneesDiv.innerHTML = '';
                 const resps = (tarefa.responsaveis || []).map(Number);
@@ -770,14 +815,57 @@
                     assigneesDiv.innerHTML = '<span class="text-muted small">Nenhum responsável atribuído.</span>';
                 } else {
                     resps.forEach(uid => {
-                        const u = getUsuario(uid);
+                        const u = buscarUsuario(uid);
                         if (!u) return;
                         const badge = document.createElement('span');
-                        badge.className = 'badge bg-dark border border-secondary text-light me-1 p-2 align-items-center gap-1 d-inline-flex';
-                        badge.innerHTML = `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}">${escapeHtml(u.iniciais)}</span> ${escapeHtml(u.nome)}`;
+                        badge.className = 'planner-removable-badge planner-removable-badge--resp';
+                        badge.innerHTML = `
+                            <span class="avatar avatar-xs rounded-circle" style="background:${u.cor}">${escaparHtml(u.iniciais)}</span>
+                            <span>${escaparHtml(u.nome)}</span>
+                            <button type="button" class="planner-removable-badge__del" data-remove-resp="${u.id}" title="Remover responsável ${escaparHtml(u.nome)}" aria-label="Remover">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        `;
                         assigneesDiv.appendChild(badge);
                     });
                 }
+            }
+
+            // 3. Renderiza avatares de pessoas soltas no modal de detalhes
+            const pessoasSoltasDiv = document.getElementById('plannerModalPessoasSoltas');
+            if (pessoasSoltasDiv) {
+                pessoasSoltasDiv.innerHTML = '';
+                const psList = (tarefa.pessoas_soltas || []).map(Number);
+                if (psList.length === 0) {
+                    pessoasSoltasDiv.innerHTML = '<span class="text-muted small">Nenhuma pessoa avulsa associada.</span>';
+                } else {
+                    psList.forEach(uid => {
+                        const u = buscarUsuario(uid);
+                        if (!u) return;
+                        const badge = document.createElement('span');
+                        badge.className = 'planner-removable-badge planner-removable-badge--ps';
+                        badge.innerHTML = `
+                            <span class="avatar avatar-xs rounded-circle" style="background:${u.cor}">${escaparHtml(u.iniciais)}</span>
+                            <span>${escaparHtml(u.nome)}</span>
+                            <button type="button" class="planner-removable-badge__del" data-remove-ps="${u.id}" title="Remover pessoa avulsa ${escaparHtml(u.nome)}" aria-label="Remover">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        `;
+                        pessoasSoltasDiv.appendChild(badge);
+                    });
+                }
+            }
+
+            // Preenche picker de equipes
+            const eqPicker = document.getElementById('plannerEquipesPicker');
+            if (eqPicker) {
+                eqPicker.setAttribute('hidden', '');
+                const checkboxes = eqPicker.querySelectorAll('input[name="eq_picker[]"]');
+                const eqList = (tarefa.equipes || []).map(Number);
+                checkboxes.forEach(cb => {
+                    cb.checked = eqList.includes(Number(cb.value));
+                    cb.closest('.planner-team-option')?.classList.toggle('is-selected', cb.checked);
+                });
             }
 
             // Preenche picker de responsáveis
@@ -792,10 +880,89 @@
                 });
             }
 
-            renderTaskComments(tarefa.id);
-            renderTaskActivities(tarefa.id);
+            // Preenche picker de pessoas soltas
+            const psPicker = document.getElementById('plannerPessoasSoltasPicker');
+            if (psPicker) {
+                psPicker.setAttribute('hidden', '');
+                const checkboxes = psPicker.querySelectorAll('input[name="ps_picker[]"]');
+                const psList = (tarefa.pessoas_soltas || []).map(Number);
+                checkboxes.forEach(cb => {
+                    cb.checked = psList.includes(Number(cb.value));
+                    cb.closest('.planner-assignee-option')?.classList.toggle('is-selected', cb.checked);
+                });
+            }
+
+            carregarComentariosTarefa(tarefa.id);
+            renderizarAtividadesTarefa(tarefa.id);
 
             if (modalTarefaInstance) modalTarefaInstance.show();
+        }
+
+
+        // Edição de equipes no modal de detalhe
+        const btnEditarEq = document.getElementById('btnEditarEquipes');
+        const eqPicker = document.getElementById('plannerEquipesPicker');
+        const btnSalvarEq = document.getElementById('btnSalvarEquipes');
+        const btnCancelarEq = document.getElementById('btnCancelarEquipes');
+
+        if (btnEditarEq && eqPicker) {
+            btnEditarEq.addEventListener('click', () => {
+                eqPicker.removeAttribute('hidden');
+                btnEditarEq.style.display = 'none';
+            });
+        }
+
+        if (btnCancelarEq && eqPicker && btnEditarEq) {
+            btnCancelarEq.addEventListener('click', () => {
+                eqPicker.setAttribute('hidden', '');
+                btnEditarEq.style.display = '';
+            });
+        }
+
+        if (btnSalvarEq && eqPicker) {
+            btnSalvarEq.addEventListener('click', async () => {
+                const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
+                if (!taskId) return;
+
+                const selecionados = Array.from(eqPicker.querySelectorAll('input[name="eq_picker[]"]:checked'))
+                    .map(cb => Number(cb.value));
+
+                try {
+                    await chamarApi('atualizar_equipes', { task_id: taskId, equipes: selecionados });
+                    const tarefa = estado.tarefas.find(t => t.id === taskId);
+                    if (tarefa) {
+                        tarefa.equipes = selecionados;
+                    }
+
+                    // Atualiza no DOM do card se existir
+                    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                    if (card) {
+                        card.dataset.teams = selecionados.join(',');
+                        let teamsWrap = card.querySelector('.task-card__teams');
+                        if (selecionados.length > 0) {
+                            const badgesHtml = selecionados.map(eqId => {
+                                const eq = buscarEquipe(eqId);
+                                return eq ? `<span class="task-card__team-badge">${escaparHtml(eq.nome)}</span>` : '';
+                            }).join('');
+                            if (!teamsWrap) {
+                                teamsWrap = document.createElement('div');
+                                teamsWrap.className = 'task-card__teams';
+                                card.querySelector('.task-card__title')?.after(teamsWrap);
+                            }
+                            teamsWrap.innerHTML = badgesHtml;
+                        } else if (teamsWrap) {
+                            teamsWrap.remove();
+                        }
+                    }
+
+                    exibirToast('Equipes atualizadas!', 'success');
+                    eqPicker.setAttribute('hidden', '');
+                    if (btnEditarEq) btnEditarEq.style.display = '';
+                    abrirDetalhesTarefa(taskId);
+                } catch (err) {
+                    // Erro tratado por plannerApi
+                }
+            });
         }
 
         // Edição de responsáveis no modal de detalhe
@@ -827,8 +994,8 @@
                     .map(cb => Number(cb.value));
 
                 try {
-                    await plannerApi('atualizar_responsaveis', { task_id: taskId, responsaveis: selecionados });
-                    const tarefa = state.tarefas.find(t => t.id === taskId);
+                    await chamarApi('atualizar_responsaveis', { task_id: taskId, responsaveis: selecionados });
+                    const tarefa = estado.tarefas.find(t => t.id === taskId);
                     if (tarefa) {
                         tarefa.responsaveis = selecionados;
                     }
@@ -837,24 +1004,200 @@
                     const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
                     if (card) {
                         card.dataset.assignees = selecionados.join(',');
+                        const avatarStack = card.querySelector('.avatar-stack');
+                        if (avatarStack) {
+                            avatarStack.innerHTML = selecionados.map(uid => {
+                                const u = buscarUsuario(uid);
+                                return u ? `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>` : '';
+                            }).join('');
+                        }
                     }
 
-                    showToast('Responsáveis atualizados!', 'success');
+                    exibirToast('Responsáveis atualizados!', 'success');
                     picker.setAttribute('hidden', '');
                     if (btnEditarResp) btnEditarResp.style.display = '';
-                    openTaskDetail(taskId);
+                    abrirDetalhesTarefa(taskId);
                 } catch (err) {
                     // Erro tratado por plannerApi
                 }
             });
         }
 
-        // 
-        function renderTaskComments(taskId) {
+        // Edição de pessoas soltas (grupo avulso) no modal de detalhe
+        const btnEditarPs = document.getElementById('btnEditarPessoasSoltas');
+        const psPicker = document.getElementById('plannerPessoasSoltasPicker');
+        const btnSalvarPs = document.getElementById('btnSalvarPessoasSoltas');
+        const btnCancelarPs = document.getElementById('btnCancelarPessoasSoltas');
+
+        if (btnEditarPs && psPicker) {
+            btnEditarPs.addEventListener('click', () => {
+                psPicker.removeAttribute('hidden');
+                btnEditarPs.style.display = 'none';
+            });
+        }
+
+        if (btnCancelarPs && psPicker && btnEditarPs) {
+            btnCancelarPs.addEventListener('click', () => {
+                psPicker.setAttribute('hidden', '');
+                btnEditarPs.style.display = '';
+            });
+        }
+
+        if (btnSalvarPs && psPicker) {
+            btnSalvarPs.addEventListener('click', async () => {
+                const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
+                if (!taskId) return;
+
+                const selecionados = Array.from(psPicker.querySelectorAll('input[name="ps_picker[]"]:checked'))
+                    .map(cb => Number(cb.value));
+
+                try {
+                    await chamarApi('atualizar_pessoas_soltas', { task_id: taskId, pessoas_soltas: selecionados });
+                    const tarefa = estado.tarefas.find(t => t.id === taskId);
+                    if (tarefa) {
+                        tarefa.pessoas_soltas = selecionados;
+                    }
+
+                    // Atualiza no DOM do card se existir
+                    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                    if (card) {
+                        let psBadge = card.querySelector('.task-card__ps-badge');
+                        if (selecionados.length > 0) {
+                            if (!psBadge) {
+                                const wrap = document.createElement('div');
+                                wrap.className = 'task-card__pessoas-soltas';
+                                wrap.innerHTML = `<span class="task-card__ps-badge"><i class="bi bi-people"></i> Grupo avulso (${selecionados.length})</span>`;
+                                card.querySelector('.task-card__title')?.after(wrap);
+                            } else {
+                                psBadge.innerHTML = `<i class="bi bi-people"></i> Grupo avulso (${selecionados.length})`;
+                            }
+                        } else if (psBadge) {
+                            psBadge.closest('.task-card__pessoas-soltas')?.remove();
+                        }
+                    }
+
+                    exibirToast('Pessoas soltas (grupo avulso) atualizadas!', 'success');
+                    psPicker.setAttribute('hidden', '');
+                    if (btnEditarPs) btnEditarPs.style.display = '';
+                    abrirDetalhesTarefa(taskId);
+                } catch (err) {
+                    // Erro tratado por plannerApi
+                }
+            });
+        }
+
+        // Remoção direta/rápida clicando no botão 'x' das badges do modal de detalhes
+        document.getElementById('plannerModalEquipes')?.addEventListener('click', async e => {
+            const delBtn = e.target.closest('[data-remove-team]');
+            if (!delBtn) return;
+            const eqId = Number(delBtn.dataset.removeTeam);
+            const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
+            const tarefa = estado.tarefas.find(t => t.id === taskId);
+            if (!tarefa || !eqId) return;
+
+            const novos = (tarefa.equipes || []).filter(id => id !== eqId);
+            try {
+                await chamarApi('atualizar_equipes', { task_id: taskId, equipes: novos });
+                tarefa.equipes = novos;
+                const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                if (card) {
+                    card.dataset.teams = novos.join(',');
+                    const teamsWrap = card.querySelector('.task-card__teams');
+                    if (novos.length > 0 && teamsWrap) {
+                        teamsWrap.innerHTML = novos.map(id => {
+                            const eq = buscarEquipe(id);
+                            return eq ? `<span class="task-card__team-badge">${escaparHtml(eq.nome)}</span>` : '';
+                        }).join('');
+                    } else if (teamsWrap) {
+                        teamsWrap.remove();
+                    }
+                }
+                exibirToast('Equipe desvinculada!', 'info');
+                abrirDetalhesTarefa(taskId);
+            } catch (err) {}
+        });
+
+        document.getElementById('plannerModalAssignees')?.addEventListener('click', async e => {
+            const delBtn = e.target.closest('[data-remove-resp]');
+            if (!delBtn) return;
+            const respId = Number(delBtn.dataset.removeResp);
+            const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
+            const tarefa = estado.tarefas.find(t => t.id === taskId);
+            if (!tarefa || !respId) return;
+
+            const novos = (tarefa.responsaveis || []).filter(id => id !== respId);
+            try {
+                await chamarApi('atualizar_responsaveis', { task_id: taskId, responsaveis: novos });
+                tarefa.responsaveis = novos;
+                const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                if (card) {
+                    card.dataset.assignees = novos.join(',');
+                    const avatarStack = card.querySelector('.avatar-stack');
+                    if (avatarStack) {
+                        avatarStack.innerHTML = novos.map(uid => {
+                            const u = buscarUsuario(uid);
+                            return u ? `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>` : '';
+                        }).join('');
+                    }
+                }
+                exibirToast('Responsável removido!', 'info');
+                abrirDetalhesTarefa(taskId);
+            } catch (err) {}
+        });
+
+        document.getElementById('plannerModalPessoasSoltas')?.addEventListener('click', async e => {
+            const delBtn = e.target.closest('[data-remove-ps]');
+            if (!delBtn) return;
+            const psId = Number(delBtn.dataset.removePs);
+            const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
+            const tarefa = estado.tarefas.find(t => t.id === taskId);
+            if (!tarefa || !psId) return;
+
+            const novos = (tarefa.pessoas_soltas || []).filter(id => id !== psId);
+            try {
+                await chamarApi('atualizar_pessoas_soltas', { task_id: taskId, pessoas_soltas: novos });
+                tarefa.pessoas_soltas = novos;
+                const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                if (card) {
+                    const psBadge = card.querySelector('.task-card__ps-badge');
+                    if (novos.length > 0) {
+                        if (psBadge) psBadge.innerHTML = `<i class="bi bi-people"></i> Grupo avulso (${novos.length})`;
+                    } else if (psBadge) {
+                        psBadge.closest('.task-card__pessoas-soltas')?.remove();
+                    }
+                }
+                exibirToast('Pessoa avulsa removida!', 'info');
+                abrirDetalhesTarefa(taskId);
+            } catch (err) {}
+        });
+
+        // Renderização e sincronização de comentários
+        async function carregarComentariosTarefa(taskId) {
+            renderizarComentariosTarefa(taskId); // Renderiza imediatamente com os dados locais em cache
+
+            try {
+                const res = await chamarApi('obter_comentarios', { tarefa_id: taskId });
+                if (res?.comentarios && Array.isArray(res.comentarios)) {
+                    // Remove os comentários antigos desta tarefa e insere os novos atualizados do servidor
+                    estado.comentarios = estado.comentarios.filter(c => Number(c.tarefa_id) !== Number(taskId)).concat(res.comentarios);
+                    renderizarComentariosTarefa(taskId);
+
+                    // Atualiza contador de comentários no card da tarefa correspondente
+                    const cardComBadge = document.querySelector(`.task-card[data-task-id="${taskId}"] [data-comment-count]`);
+                    if (cardComBadge) {
+                        cardComBadge.textContent = res.comentarios.length;
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao sincronizar comentários da tarefa:', err);
+            }
+        }
+
+        function renderizarComentariosTarefa(taskId) {
             const container = document.getElementById('plannerCommentThread');
             if (!container) return;
 
-            const coms = state.comentarios.filter(c => c.tarefa_id === taskId);
+            const coms = estado.comentarios.filter(c => c.tarefa_id === taskId);
             container.innerHTML = '';
 
             if (coms.length === 0) {
@@ -863,8 +1206,8 @@
             }
 
             coms.forEach(c => {
-                const autor = getUsuario(c.usuario_id);
-                const isAuthor = Number(c.usuario_id) === Number(state.usuarioAtual.id);
+                const autor = buscarUsuario(c.usuario_id);
+                const isAuthor = Number(c.usuario_id) === Number(estado.usuarioAtual.id);
 
                 const item = document.createElement('div');
                 item.className = 'planner-comment';
@@ -873,26 +1216,27 @@
                 item.innerHTML = `
                     <div class="planner-comment__avatar">
                         <span class="avatar avatar-sm rounded-circle" style="background:${autor?.cor || '#6366f1'}">
-                            ${escapeHtml(autor?.iniciais || '?')}
+                            ${escaparHtml(autor?.iniciais || '?')}
                         </span>
                     </div>
                     <div class="planner-comment__content">
                         <div class="planner-comment__header">
-                            <span class="planner-comment__author">${escapeHtml(autor?.nome || 'Usuário')}</span>
-                            <span class="planner-comment__time">${formatRelativeTime(c.criado_em)}${c.editado_em ? ' <em class="text-muted">(editado)</em>' : ''}</span>
+                            <span class="planner-comment__author">${escaparHtml(autor?.nome || 'Usuário')}</span>
+                            <span class="planner-comment__time">${formatarTempoRelativo(c.criado_em)}${c.editado_em ? ' <em class="text-muted">(editado)</em>' : ''}</span>
                             ${isAuthor ? `
                             <div class="planner-comment__actions ms-auto">
                                 <button type="button" class="btn btn-link btn-sm p-0 text-muted me-2" data-comment-action="edit">Editar</button>
                                 <button type="button" class="btn btn-link btn-sm p-0 text-danger" data-comment-action="delete">Excluir</button>
                             </div>` : ''}
                         </div>
-                        <div class="planner-comment__body">${escapeHtml(c.texto)}</div>
+                        <div class="planner-comment__body">${escaparHtml(c.texto)}</div>
                     </div>
                 `;
 
                 container.appendChild(item);
             });
         }
+
 
         const commentForm = document.getElementById('plannerCommentForm');
         if (commentForm) {
@@ -908,12 +1252,12 @@
                 if (submitBtn) submitBtn.disabled = true;
 
                 try {
-                    const res = await plannerApi('criar_comentario', { tarefa_id: taskId, texto });
+                    const res = await chamarApi('criar_comentario', { tarefa_id: taskId, texto });
                     if (res?.comentario) {
-                        state.comentarios.push(res.comentario);
-                        renderTaskComments(taskId);
+                        estado.comentarios.push(res.comentario);
+                        renderizarComentariosTarefa(taskId);
                         if (textInput) textInput.value = '';
-                        showToast('Comentário enviado!', 'success');
+                        exibirToast('Comentário enviado!', 'success');
                     }
                 } finally {
                     if (submitBtn) submitBtn.disabled = false;
@@ -929,16 +1273,16 @@
             if (!commentEl) return;
 
             const comId = Number(commentEl.dataset.comentarioId);
-            const comentario = state.comentarios.find(c => c.id === comId);
+            const comentario = estado.comentarios.find(c => c.id === comId);
             if (!comentario) return;
 
             if (delBtn) {
                 if (!confirm('Deseja realmente excluir este comentário?')) return;
                 try {
-                    await plannerApi('excluir_comentario', { comentario_id: comId });
-                    state.comentarios = state.comentarios.filter(c => c.id !== comId);
-                    renderTaskComments(comentario.tarefa_id);
-                    showToast('Comentário excluído!', 'info');
+                    await chamarApi('excluir_comentario', { comentario_id: comId });
+                    estado.comentarios = estado.comentarios.filter(c => c.id !== comId);
+                    renderizarComentariosTarefa(comentario.tarefa_id);
+                    exibirToast('Comentário excluído!', 'info');
                 } catch (err) {}
             } else if (editBtn) {
                 const bodyEl = commentEl.querySelector('.planner-comment__body');
@@ -947,7 +1291,7 @@
                 const textoOriginal = comentario.texto;
                 bodyEl.innerHTML = `
                     <div class="mt-2">
-                        <textarea class="form-control form-control-sm mb-2" rows="2">${escapeHtml(textoOriginal)}</textarea>
+                        <textarea class="form-control form-control-sm mb-2" rows="2">${escaparHtml(textoOriginal)}</textarea>
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-sm btn-primary" id="btnSalvarComEdit">Salvar</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCancelarComEdit">Cancelar</button>
@@ -963,21 +1307,21 @@
                     const novoTexto = bodyEl.querySelector('textarea')?.value.trim();
                     if (!novoTexto) return;
                     try {
-                        const res = await plannerApi('editar_comentario', { comentario_id: comId, texto: novoTexto });
+                        const res = await chamarApi('editar_comentario', { comentario_id: comId, texto: novoTexto });
                         comentario.texto = novoTexto;
                         comentario.editado_em = res?.editado_em || new Date().toISOString();
-                        renderTaskComments(comentario.tarefa_id);
-                        showToast('Comentário atualizado!', 'success');
+                        renderizarComentariosTarefa(comentario.tarefa_id);
+                        exibirToast('Comentário atualizado!', 'success');
                     } catch (err) {}
                 });
             }
         });
 
-        function renderTaskActivities(taskId) {
+        function renderizarAtividadesTarefa(taskId) {
             const container = document.getElementById('plannerActivityLog');
             if (!container) return;
 
-            const acts = state.atividades.filter(a => a.tarefa_id === taskId);
+            const acts = estado.atividades.filter(a => a.tarefa_id === taskId);
             container.innerHTML = '';
 
             if (acts.length === 0) {
@@ -986,15 +1330,15 @@
             }
 
             acts.forEach(a => {
-                const user = getUsuario(a.usuario_id);
+                const user = buscarUsuario(a.usuario_id);
                 const li = document.createElement('li');
                 li.className = 'planner-activity-log__item';
 
                 let desc = 'realizou uma alteração';
                 if (a.tipo === 'criacao') desc = 'criou a tarefa';
                 else if (a.tipo === 'movimentacao') {
-                    const de = a.meta?.de ? (getColuna(a.meta.de)?.titulo || a.meta.de) : '';
-                    const para = a.meta?.para ? (getColuna(a.meta.para)?.titulo || a.meta.para) : '';
+                    const de = a.meta?.de ? (buscarColuna(a.meta.de)?.titulo || a.meta.de) : '';
+                    const para = a.meta?.para ? (buscarColuna(a.meta.para)?.titulo || a.meta.para) : '';
                     desc = `moveu de «${de}» para «${para}»`;
                 } else if (a.tipo === 'atribuicao') {
                     desc = 'atualizou os responsáveis';
@@ -1005,8 +1349,8 @@
                 li.innerHTML = `
                     <span class="planner-activity-log__dot"></span>
                     <div class="planner-activity-log__content">
-                        <strong>${escapeHtml(user?.nome || 'Usuário')}</strong> ${escapeHtml(desc)}
-                        <span class="planner-activity-log__date">${formatRelativeTime(a.criado_em)}</span>
+                        <strong>${escaparHtml(user?.nome || 'Usuário')}</strong> ${escaparHtml(desc)}
+                        <span class="planner-activity-log__date">${formatarTempoRelativo(a.criado_em)}</span>
                     </div>
                 `;
                 container.appendChild(li);
@@ -1026,6 +1370,7 @@
                 const prazoInput = document.getElementById('novaTarefaPrazo');
                 const respCheckboxes = formNova.querySelectorAll('input[name="responsaveis[]"]:checked');
                 const teamCheckboxes = formNova.querySelectorAll('input[name="equipes[]"]:checked');
+                const psCheckboxes   = formNova.querySelectorAll('input[name="pessoas_soltas[]"]:checked');
 
                 const titulo = tituloInput?.value.trim();
                 if (!titulo) {
@@ -1041,24 +1386,25 @@
                     prioridade: prioInput?.value || 'media',
                     prazo: prazoInput?.value || null,
                     responsaveis: Array.from(respCheckboxes).map(cb => Number(cb.value)),
-                    equipes: Array.from(teamCheckboxes).map(cb => Number(cb.value))
+                    equipes: Array.from(teamCheckboxes).map(cb => Number(cb.value)),
+                    pessoas_soltas: Array.from(psCheckboxes).map(cb => Number(cb.value))
                 };
 
                 const submitBtn = document.getElementById('plannerBtnCriarTarefa');
                 if (submitBtn) submitBtn.disabled = true;
 
                 try {
-                    const res = await plannerApi('criar_tarefa', payload);
+                    const res = await chamarApi('criar_tarefa', payload);
                     if (res?.tarefa) {
                         res.tarefa.status_prazo = calcularStatusPrazo(res.tarefa.prazo);
-                        state.tarefas.push(res.tarefa);
+                        estado.tarefas.push(res.tarefa);
 
                         // Adiciona card no Kanban
                         const targetBody = document.querySelector(`[data-column-body="${res.tarefa.coluna_id}"]`);
                         if (targetBody) {
-                            const newCard = buildKanbanCard(res.tarefa);
+                            const newCard = construirCardKanban(res.tarefa);
                             targetBody.prepend(newCard);
-                            updateColumnCounts();
+                            atualizarContagemColunas();
                         }
 
                         // Fecha modal
@@ -1067,7 +1413,9 @@
                             window.bootstrap.Modal.getInstance(modalEl)?.hide();
                         }
                         formNova.reset();
-                        showToast('Nova tarefa criada com sucesso!', 'success');
+                        formNova.querySelectorAll('.planner-assignee-option.is-selected').forEach(el => el.classList.remove('is-selected'));
+                        atualizarResumosAcordeons();
+                        exibirToast('Nova tarefa criada com sucesso!', 'success');
                     }
                 } finally {
                     if (submitBtn) submitBtn.disabled = false;
@@ -1121,10 +1469,10 @@
                 if (submitBtn) submitBtn.disabled = true;
 
                 try {
-                    const res = await plannerApi('criar_equipe', { nome, cor, pai_id: paiId, membros });
+                    const res = await chamarApi('criar_equipe', { nome, cor, pai_id: paiId, membros });
                     if (res?.equipe) {
                         const novaEquipe = res.equipe;
-                        state.equipes.push(novaEquipe);
+                        estado.equipes.push(novaEquipe);
 
                         // 1. Injeta no dropdown multi-select de Equipes
                         const msList = document.querySelector('#dropdownFiltroEquipes .planner-multiselect__list');
@@ -1135,7 +1483,7 @@
                             label.innerHTML = `
                                 <input type="checkbox" name="filtro_equipes[]" value="${novaEquipe.id}">
                                 <span class="planner-multiselect__check-custom"></span>
-                                <span class="planner-multiselect__text">${escapeHtml(novaEquipe.nome)}</span>
+                                <span class="planner-multiselect__text">${escaparHtml(novaEquipe.nome)}</span>
                             `;
                             msList.appendChild(label);
                         }
@@ -1148,7 +1496,7 @@
                             opt.dataset.teamId = String(novaEquipe.id);
                             opt.innerHTML = `
                                 <input type="checkbox" name="equipes[]" value="${novaEquipe.id}">
-                                <span>${escapeHtml(novaEquipe.nome)}</span>
+                                <span>${escaparHtml(novaEquipe.nome)}</span>
                             `;
                             teamsPicker.appendChild(opt);
                         }
@@ -1167,7 +1515,7 @@
                             window.bootstrap.Modal.getInstance(modalEl)?.hide();
                         }
                         formNovaEquipe.reset();
-                        showToast(`Equipe "${novaEquipe.nome}" criada com sucesso!`, 'success');
+                        exibirToast(`Equipe "${novaEquipe.nome}" criada com sucesso!`, 'success');
                     }
                 } finally {
                     if (submitBtn) submitBtn.disabled = false;
@@ -1175,7 +1523,7 @@
             });
         }
 
-        function buildKanbanCard(t) {
+        function construirCardKanban(t) {
             const prioLabels = { urgente: 'URGENTE', alta: 'ALTA', media: 'MÉDIA', baixa: 'BAIXA' };
             const article = document.createElement('article');
             article.className = `task-card priority-${t.prioridade} sp-${t.status_prazo || 'futura'}`;
@@ -1188,8 +1536,8 @@
             article.dataset.teams = (t.equipes || []).join(',');
 
             const equipesHtml = (t.equipes || []).map(eqId => {
-                const eq = getEquipe(eqId);
-                return eq ? `<span class="task-card__team-badge">${escapeHtml(eq.nome)}</span>` : '';
+                const eq = buscarEquipe(eqId);
+                return eq ? `<span class="task-card__team-badge">${escaparHtml(eq.nome)}</span>` : '';
             }).join('');
 
             article.innerHTML = `
@@ -1206,18 +1554,24 @@
                         </button>
                     </div>
                 </div>
-                <h3 class="task-card__title">${escapeHtml(t.titulo)}</h3>
+                <h3 class="task-card__title">${escaparHtml(t.titulo)}</h3>
                 ${equipesHtml ? `<div class="task-card__teams">${equipesHtml}</div>` : ''}
-                ${t.descricao ? `<p class="task-card__desc">${escapeHtml(t.descricao)}</p>` : ''}
+                ${t.pessoas_soltas && t.pessoas_soltas.length > 0 ? `
+                    <div class="task-card__pessoas-soltas">
+                        <span class="task-card__ps-badge" title="Grupo avulso (pessoas soltas)">
+                            <i class="bi bi-people" aria-hidden="true"></i> Grupo avulso (${t.pessoas_soltas.length})
+                        </span>
+                    </div>` : ''}
+                ${t.descricao ? `<p class="task-card__desc">${escaparHtml(t.descricao)}</p>` : ''}
                 <footer class="task-card__footer">
                     <span class="task-card__date">
-                        <i class="bi bi-calendar-event" aria-hidden="true"></i> ${t.prazo ? escapeHtml(t.prazo) : 'Sem prazo'}
+                        <i class="bi bi-calendar-event" aria-hidden="true"></i> ${t.prazo ? escaparHtml(t.prazo) : 'Sem prazo'}
                     </span>
                     <span class="task-card__meta">
                         <span class="avatar-stack">
                             ${(t.responsaveis || []).map(uid => {
-                                const u = getUsuario(uid);
-                                return u ? `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}" title="${escapeHtml(u.nome)}">${escapeHtml(u.iniciais)}</span>` : '';
+                                const u = buscarUsuario(uid);
+                                return u ? `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>` : '';
                             }).join('')}
                         </span>
                     </span>
@@ -1226,203 +1580,31 @@
             return article;
         }
 
-        // 
-        const spotlight = document.getElementById('planner-busca-global');
-        const spotlightInput = document.getElementById('plannerSpotlightInput');
-        const spotlightResults = document.getElementById('plannerSpotlightResults');
-        const btnSpotlight = document.getElementById('btnSpotlight');
-
-        function openSpotlight() {
-            if (!spotlight || !spotlightInput) return;
-            spotlight.removeAttribute('hidden');
-            spotlightInput.value = '';
-            renderSpotlightResults('');
-            spotlightInput.focus();
-        }
-
-        function closeSpotlight() {
-            if (!spotlight) return;
-            spotlight.setAttribute('hidden', '');
-        }
-
-        document.addEventListener('keydown', e => {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-                e.preventDefault();
-                if (spotlight && !spotlight.hasAttribute('hidden')) closeSpotlight();
-                else openSpotlight();
-            } else if (e.key === 'Escape' && spotlight && !spotlight.hasAttribute('hidden')) {
-                closeSpotlight();
-            }
-        });
-
-        if (btnSpotlight) btnSpotlight.addEventListener('click', openSpotlight);
-
-        document.getElementById('plannerSpotlightBackdrop')?.addEventListener('click', closeSpotlight);
-
-        if (spotlightInput) {
-            spotlightInput.addEventListener('input', () => {
-                renderSpotlightResults(spotlightInput.value.trim());
-            });
-
-            spotlightInput.addEventListener('keydown', e => {
-                const items = Array.from(spotlightResults?.querySelectorAll('.planner-spotlight__item') || []);
-                const current = spotlightResults?.querySelector('.planner-spotlight__item.is-selected');
-                let index = items.indexOf(current);
-
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    if (current) current.classList.remove('is-selected');
-                    const next = items[(index + 1) % items.length];
-                    if (next) {
-                        next.classList.add('is-selected');
-                        next.scrollIntoView({ block: 'nearest' });
-                    }
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    if (current) current.classList.remove('is-selected');
-                    const prev = items[(index - 1 + items.length) % items.length];
-                    if (prev) {
-                        prev.classList.add('is-selected');
-                        prev.scrollIntoView({ block: 'nearest' });
-                    }
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (current) current.click();
-                }
-            });
-        }
-
-        function renderSpotlightResults(query) {
-            if (!spotlightResults) return;
-            spotlightResults.innerHTML = '';
-
-            if (!query) {
-                spotlightResults.innerHTML = `
-                    <li class="planner-spotlight__hint" role="option">
-                        <i class="bi bi-lightbulb" aria-hidden="true"></i>
-                        Digite para buscar tarefas, pessoas ou equipes...
-                    </li>
-                `;
-                return;
-            }
-
-            const q = query.toLowerCase();
-            const matchingTasks = state.tarefas.filter(t =>
-                (t.titulo || '').toLowerCase().includes(q) || (t.descricao || '').toLowerCase().includes(q)
-            ).slice(0, 5);
-
-            const matchingUsers = state.usuarios.filter(u =>
-                (u.nome || '').toLowerCase().includes(q) || (u.cargo || '').toLowerCase().includes(q)
-            ).slice(0, 3);
-
-            const matchingEquipes = state.equipes.filter(e =>
-                (e.nome || '').toLowerCase().includes(q)
-            ).slice(0, 3);
-
-            if (matchingTasks.length === 0 && matchingUsers.length === 0 && matchingEquipes.length === 0) {
-                spotlightResults.innerHTML = `
-                    <li class="planner-spotlight__hint" role="option">
-                        <i class="bi bi-emoji-neutral" aria-hidden="true"></i>
-                        Nenhum resultado encontrado para «${escapeHtml(query)}».
-                    </li>
-                `;
-                return;
-            }
-
-            // Seção Tarefas
-            if (matchingTasks.length > 0) {
-                const groupHeader = document.createElement('li');
-                groupHeader.className = 'planner-spotlight__group-header text-muted small px-3 py-1';
-                groupHeader.textContent = 'Tarefas';
-                spotlightResults.appendChild(groupHeader);
-
-                matchingTasks.forEach(t => {
-                    const li = document.createElement('li');
-                    li.className = 'planner-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
-                    li.innerHTML = `
-                        <i class="bi bi-check2-circle text-primary"></i>
-                        <span class="flex-fill text-truncate">${escapeHtml(t.titulo)}</span>
-                        <span class="badge badge-priority-${t.prioridade} small">${t.prioridade}</span>
-                    `;
-                    li.addEventListener('click', () => {
-                        closeSpotlight();
-                        openTaskDetail(t.id);
-                    });
-                    spotlightResults.appendChild(li);
-                });
-            }
-
-            // Seção Pessoas
-            if (matchingUsers.length > 0) {
-                const groupHeader = document.createElement('li');
-                groupHeader.className = 'planner-spotlight__group-header text-muted small px-3 py-1 mt-2';
-                groupHeader.textContent = 'Pessoas';
-                spotlightResults.appendChild(groupHeader);
-
-                matchingUsers.forEach(u => {
-                    const li = document.createElement('li');
-                    li.className = 'planner-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
-                    li.innerHTML = `
-                        <span class="avatar avatar-xs rounded-circle" style="background:${u.cor}">${escapeHtml(u.iniciais)}</span>
-                        <span class="flex-fill text-truncate">${escapeHtml(u.nome)} <small class="text-muted">(${escapeHtml(u.cargo)})</small></span>
-                    `;
-                    li.addEventListener('click', () => {
-                        closeSpotlight();
-                        state.filtros.usuario = u.id;
-                        avatarBtns.forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.filterUsuario) === u.id ? 'true' : 'false'));
-                        syncFilters();
-                    });
-                    spotlightResults.appendChild(li);
-                });
-            }
-
-            // Seção Equipes
-            if (matchingEquipes.length > 0) {
-                const groupHeader = document.createElement('li');
-                groupHeader.className = 'planner-spotlight__group-header text-muted small px-3 py-1 mt-2';
-                groupHeader.textContent = 'Equipes';
-                spotlightResults.appendChild(groupHeader);
-
-                matchingEquipes.forEach(eq => {
-                    const li = document.createElement('li');
-                    li.className = 'planner-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
-                    li.innerHTML = `
-                        <i class="bi bi-people text-info"></i>
-                        <span class="flex-fill text-truncate">${escapeHtml(eq.nome)}</span>
-                    `;
-                    li.addEventListener('click', () => {
-                        closeSpotlight();
-                        state.filtros.equipe = eq.id;
-                        if (filtroEquipe) filtroEquipe.value = String(eq.id);
-                        syncFilters();
-                    });
-                    spotlightResults.appendChild(li);
-                });
-            }
-
-            const firstResult = spotlightResults.querySelector('.planner-spotlight__item');
-            if (firstResult) firstResult.classList.add('is-selected');
-        }
+        // § 13 · SPOTLIGHT — desativado (removido da interface)
+        // O painel de busca global (Ctrl+K) foi removido a pedido do usuário.
+        function abrirSpotlight()  { /* desativado */ }
+        function fecharSpotlight() { /* desativado */ }
+        function renderizarResultadosSpotlight() { /* desativado */ }
 
         // 
-        function renderDashboardCharts() {
+        function renderizarGraficosDashboard() {
             if (typeof Chart === 'undefined') return;
 
             const canvasColuna = document.getElementById('chartPorColuna');
             const canvasPrio = document.getElementById('chartPorPrioridade');
             const canvasAtiv = document.getElementById('chartAtividade7dias');
 
-            const tarefasFiltradas = state.tarefas.filter(taskMatchesFilters);
+        const tarefasFiltradas = estado.tarefas.filter(tarefaPassaNosFiltos);
 
             // Gráfico 1: Tarefas por Coluna
             if (canvasColuna) {
-                if (state.activeCharts.coluna) state.activeCharts.coluna.destroy();
+                if (estado.graficosAtivos.coluna) estado.graficosAtivos.coluna.destroy();
 
-                const labels = state.colunas.map(c => c.titulo);
-                const data = state.colunas.map(c => tarefasFiltradas.filter(t => t.coluna_id === c.id).length);
-                const colors = state.colunas.map(c => c.cor);
+                const labels = estado.colunas.map(c => c.titulo);
+                const data = estado.colunas.map(c => tarefasFiltradas.filter(t => t.coluna_id === c.id).length);
+                const colors = estado.colunas.map(c => c.cor);
 
-                state.activeCharts.coluna = new Chart(canvasColuna, {
+                estado.graficosAtivos.coluna = new Chart(canvasColuna, {
                     type: 'bar',
                     data: {
                         labels,
@@ -1445,14 +1627,14 @@
 
             // Gráfico 2: Tarefas por Prioridade
             if (canvasPrio) {
-                if (state.activeCharts.prio) state.activeCharts.prio.destroy();
+                if (estado.graficosAtivos.prio) estado.graficosAtivos.prio.destroy();
 
                 const prios = ['urgente', 'alta', 'media', 'baixa'];
                 const labelsPrio = ['Urgente', 'Alta', 'Média', 'Baixa'];
                 const dataPrio = prios.map(p => tarefasFiltradas.filter(t => t.prioridade === p).length);
                 const colorsPrio = ['#EF4444', '#F97316', '#FACC15', '#10B981'];
 
-                state.activeCharts.prio = new Chart(canvasPrio, {
+                estado.graficosAtivos.prio = new Chart(canvasPrio, {
                     type: 'doughnut',
                     data: {
                         labels: labelsPrio,
@@ -1474,7 +1656,7 @@
 
             // Gráfico 3: Atividades últimos 7 dias
             if (canvasAtiv) {
-                if (state.activeCharts.ativ) state.activeCharts.ativ.destroy();
+                if (estado.graficosAtivos.ativ) estado.graficosAtivos.ativ.destroy();
 
                 const diasLabels = [];
                 const diasContagem = [];
@@ -1485,11 +1667,11 @@
                     const label = `${d.getDate()}/${d.getMonth() + 1}`;
                     diasLabels.push(label);
 
-                    const count = state.atividades.filter(a => a.criado_em && a.criado_em.startsWith(iso)).length;
+                    const count = estado.atividades.filter(a => a.criado_em && a.criado_em.startsWith(iso)).length;
                     diasContagem.push(count);
                 }
 
-                state.activeCharts.ativ = new Chart(canvasAtiv, {
+                estado.graficosAtivos.ativ = new Chart(canvasAtiv, {
                     type: 'line',
                     data: {
                         labels: diasLabels,
@@ -1524,9 +1706,9 @@
                 const colunas = ['ID', 'Título', 'Descrição', 'Coluna', 'Prioridade', 'Prazo', 'Status do Prazo', 'Responsáveis'];
                 const linhas = [colunas.join(';')];
 
-                state.tarefas.forEach(t => {
-                    const col = getColuna(t.coluna_id)?.titulo || t.coluna_id;
-                    const resps = (t.responsaveis || []).map(uid => getUsuario(uid)?.nome || uid).join(', ');
+                estado.tarefas.forEach(t => {
+                    const col = buscarColuna(t.coluna_id)?.titulo || t.coluna_id;
+                    const resps = (t.responsaveis || []).map(uid => buscarUsuario(uid)?.nome || uid).join(', ');
                     const linha = [
                         t.id,
                         `"${(t.titulo || '').replace(/"/g, '""')}"`,
@@ -1550,7 +1732,7 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                showToast('Arquivo CSV gerado com sucesso!', 'success');
+                exibirToast('Arquivo CSV gerado com sucesso!', 'success');
             });
         }
 
@@ -1578,7 +1760,7 @@
                     calMes = 12;
                     calAno--;
                 }
-                renderPlannerCalendar();
+                renderizarCalendario();
             });
         }
 
@@ -1589,7 +1771,7 @@
                     calMes = 1;
                     calAno++;
                 }
-                renderPlannerCalendar();
+                renderizarCalendario();
             });
         }
 
@@ -1598,15 +1780,15 @@
                 const now = new Date();
                 calAno = now.getFullYear();
                 calMes = now.getMonth() + 1;
-                renderPlannerCalendar();
+                renderizarCalendario();
             });
         }
 
-        function formatCalDateIso(ano, mes, dia) {
+        function formatarDataIso(ano, mes, dia) {
             return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
         }
 
-        function formatCalDateLong(iso) {
+        function formatarDataLonga(iso) {
             const parts = iso.split('-');
             if (parts.length !== 3) return iso;
             const d = parseInt(parts[2], 10);
@@ -1615,7 +1797,7 @@
             return `${d} de ${MESES_PT[m - 1]} de ${y}`;
         }
 
-        function renderPlannerCalendar() {
+        function renderizarCalendario() {
             const grid = document.getElementById('plannerCalendarGrid');
             const label = document.getElementById('calendarLabel');
             if (!grid || !label) return;
@@ -1644,11 +1826,11 @@
 
             // Renderiza cada dia do mês
             for (let d = 1; d <= diasNoMes; d++) {
-                const iso = formatCalDateIso(calAno, calMes, d);
+                const iso = formatarDataIso(calAno, calMes, d);
                 const isHoje = (iso === hojeIso);
 
                 // Tarefas do dia que passam pelos filtros ativos
-                const tarefasDoDia = state.tarefas.filter(t => t.prazo === iso && taskMatchesFilters(t));
+                const tarefasDoDia = estado.tarefas.filter(t => t.prazo === iso && tarefaPassaNosFiltos(t));
                 const numTs = tarefasDoDia.length;
 
                 const btn = document.createElement('button');
@@ -1687,7 +1869,7 @@
 
                 // Clique no dia abre o Offcanvas de detalhes do dia
                 btn.addEventListener('click', () => {
-                    openDayDetails(iso);
+                    abrirDetalhesDia(iso);
                 });
 
                 fragment.appendChild(btn);
@@ -1696,15 +1878,15 @@
             grid.appendChild(fragment);
         }
 
-        function openDayDetails(iso) {
+        function abrirDetalhesDia(iso) {
             if (!offcanvasDiaEl || !offcanvasDiaBody) return;
 
             if (offcanvasDiaTitle) {
-                offcanvasDiaTitle.textContent = `Tarefas de ${formatCalDateLong(iso)}`;
+                offcanvasDiaTitle.textContent = `Tarefas de ${formatarDataLonga(iso)}`;
             }
 
             // Tarefas deste dia (aplicando filtros atuais)
-            const tarefasDoDia = state.tarefas.filter(t => t.prazo === iso && taskMatchesFilters(t));
+            const tarefasDoDia = estado.tarefas.filter(t => t.prazo === iso && tarefaPassaNosFiltos(t));
             offcanvasDiaBody.innerHTML = '';
 
             if (tarefasDoDia.length === 0) {
@@ -1720,7 +1902,7 @@
                 list.className = 'planner-cal-task-list d-flex flex-column gap-2';
 
                 tarefasDoDia.forEach(t => {
-                    const coluna = getColuna(t.coluna_id);
+                    const coluna = buscarColuna(t.coluna_id);
                     const prioMeta = {
                         urgente: { rotulo: 'Urgente', classe: 'prio-urgente' },
                         alta: { rotulo: 'Alta', classe: 'prio-alta' },
@@ -1745,7 +1927,7 @@
                     card.addEventListener('click', () => {
                         const bsOffcanvas = window.bootstrap?.Offcanvas?.getInstance(offcanvasDiaEl);
                         if (bsOffcanvas) bsOffcanvas.hide();
-                        openTaskDetail(t.id);
+                        abrirDetalhesTarefa(t.id);
                     });
 
                     // Renderiza avatares dos responsáveis
@@ -1753,9 +1935,9 @@
                     if (Array.isArray(t.responsaveis) && t.responsaveis.length > 0) {
                         respsHtml = `<div class="avatar-stack">`;
                         t.responsaveis.slice(0, 3).forEach(uid => {
-                            const u = getUsuario(uid);
+                            const u = buscarUsuario(uid);
                             if (u) {
-                                respsHtml += `<span class="avatar avatar-xs" style="background-color: ${escapeHtml(u.cor)}" title="${escapeHtml(u.nome)}">${escapeHtml(u.iniciais)}</span>`;
+                                respsHtml += `<span class="avatar avatar-xs" style="background-color: ${escaparHtml(u.cor)}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>`;
                             }
                         });
                         if (t.responsaveis.length > 3) {
@@ -1767,12 +1949,12 @@
                     card.innerHTML = `
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="planner-prio-tag ${prioMeta.classe}">${prioMeta.rotulo}</span>
-                            <span class="badge" style="background: rgba(255,255,255,0.06); color: ${coluna?.cor || '#94A3B8'}; font-size: 0.72rem;">${escapeHtml(coluna?.titulo || t.coluna_id)}</span>
+                            <span class="badge" style="background: rgba(255,255,255,0.06); color: ${coluna?.cor || '#94A3B8'}; font-size: 0.72rem;">${escaparHtml(coluna?.titulo || t.coluna_id)}</span>
                         </div>
-                        <h6 class="mb-1 text-white fw-bold" style="font-size: 0.92rem;">${escapeHtml(t.titulo)}</h6>
-                        ${t.descricao ? `<p class="text-muted small mb-2" style="font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(t.descricao)}</p>` : ''}
+                        <h6 class="mb-1 text-white fw-bold" style="font-size: 0.92rem;">${escaparHtml(t.titulo)}</h6>
+                        ${t.descricao ? `<p class="text-muted small mb-2" style="font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escaparHtml(t.descricao)}</p>` : ''}
                         <div class="d-flex align-items-center justify-content-between mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.05);">
-                            <span class="text-muted small" style="font-size: 0.75rem;"><i class="bi bi-clock me-1"></i>${escapeHtml(iso)}</span>
+                            <span class="text-muted small" style="font-size: 0.75rem;"><i class="bi bi-clock me-1"></i>${escaparHtml(iso)}</span>
                             ${respsHtml}
                         </div>
                     `;
@@ -1789,9 +1971,130 @@
             }
         }
 
+        // =============================================================================
+        // § 14 · ACORDEONS DE ATRIBUIÇÃO (EQUIPES / RESPONSÁVEIS / PESSOAS SOLTAS)
+        // =============================================================================
+        function atualizarResumosAcordeons() {
+            // 1. Resumo Equipes
+            const eqCheckboxes = document.querySelectorAll('#accEquipesContent input[name="equipes[]"]:checked');
+            const eqBadge = document.getElementById('badgeAccEquipes');
+            const eqSummary = document.getElementById('summaryAccEquipes');
+            if (eqBadge && eqSummary) {
+                const totalEq = eqCheckboxes.length;
+                if (totalEq > 0) {
+                    eqBadge.textContent = String(totalEq);
+                    eqBadge.classList.remove('d-none');
+                    const nomes = Array.from(eqCheckboxes).map(cb => {
+                        const opt = cb.closest('.planner-team-option');
+                        return opt ? opt.querySelector('span')?.textContent.trim() : '';
+                    }).filter(Boolean);
+                    if (nomes.length <= 2) {
+                        eqSummary.innerHTML = nomes.map(n => `<span class="badge-preview">${escaparHtml(n)}</span>`).join('');
+                    } else {
+                        eqSummary.innerHTML = `<span class="badge-preview">${escaparHtml(nomes[0])}</span> <span class="badge-preview">+${nomes.length - 1} equipe(s)</span>`;
+                    }
+                } else {
+                    eqBadge.classList.add('d-none');
+                    eqSummary.innerHTML = '<span class="text-muted small">Nenhuma selecionada</span>';
+                }
+            }
+
+            // 2. Resumo Responsáveis
+            const respCheckboxes = document.querySelectorAll('#accResponsaveisContent input[name="responsaveis[]"]:checked');
+            const respBadge = document.getElementById('badgeAccResponsaveis');
+            const respSummary = document.getElementById('summaryAccResponsaveis');
+            if (respBadge && respSummary) {
+                const totalResp = respCheckboxes.length;
+                if (totalResp > 0) {
+                    respBadge.textContent = String(totalResp);
+                    respBadge.classList.remove('d-none');
+                    const nomes = Array.from(respCheckboxes).map(cb => {
+                        const opt = cb.closest('.planner-assignee-option');
+                        return opt ? opt.querySelector('.planner-assignee-option__nome')?.textContent.trim() : '';
+                    }).filter(Boolean);
+                    if (nomes.length <= 2) {
+                        eqSummary; // no-op
+                        respSummary.innerHTML = nomes.map(n => `<span class="badge-preview">${escaparHtml(n)}</span>`).join('');
+                    } else {
+                        respSummary.innerHTML = `<span class="badge-preview">${escaparHtml(nomes[0])}</span> <span class="badge-preview">+${nomes.length - 1} pessoa(s)</span>`;
+                    }
+                } else {
+                    respBadge.classList.add('d-none');
+                    respSummary.innerHTML = '<span class="text-muted small">Nenhum selecionado</span>';
+                }
+            }
+
+            // 3. Resumo Pessoas Soltas
+            const psCheckboxes = document.querySelectorAll('#accPessoasSoltasContent input[name="pessoas_soltas[]"]:checked');
+            const psBadge = document.getElementById('badgeAccPessoasSoltas');
+            const psSummary = document.getElementById('summaryAccPessoasSoltas');
+            if (psBadge && psSummary) {
+                const totalPs = psCheckboxes.length;
+                if (totalPs > 0) {
+                    psBadge.textContent = String(totalPs);
+                    psBadge.classList.remove('d-none');
+                    const nomes = Array.from(psCheckboxes).map(cb => {
+                        const opt = cb.closest('.planner-assignee-option');
+                        return opt ? opt.querySelector('.planner-assignee-option__nome')?.textContent.trim() : '';
+                    }).filter(Boolean);
+                    if (nomes.length <= 2) {
+                        psSummary.innerHTML = nomes.map(n => `<span class="badge-preview text-success-emphasis">${escaparHtml(n)}</span>`).join('');
+                    } else {
+                        psSummary.innerHTML = `<span class="badge-preview text-success-emphasis">${escaparHtml(nomes[0])}</span> <span class="badge-preview">+${nomes.length - 1} avulsa(s)</span>`;
+                    }
+                } else {
+                    psBadge.classList.add('d-none');
+                    psSummary.innerHTML = '<span class="text-muted small">Nenhuma selecionada</span>';
+                }
+            }
+        }
+
+        function inicializarAcordeonsAtribuicao() {
+            const accordionHeaders = document.querySelectorAll('.planner-accordion__header');
+            accordionHeaders.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const accordion = btn.closest('.planner-accordion');
+                    if (!accordion) return;
+                    const contentId = btn.getAttribute('aria-controls');
+                    const content = document.getElementById(contentId);
+                    if (!content) return;
+
+                    const isOpen = accordion.classList.contains('is-open');
+                    if (isOpen) {
+                        accordion.classList.remove('is-open');
+                        btn.setAttribute('aria-expanded', 'false');
+                        content.setAttribute('hidden', '');
+                    } else {
+                        accordion.classList.add('is-open');
+                        btn.setAttribute('aria-expanded', 'true');
+                        content.removeAttribute('hidden');
+                    }
+                });
+            });
+
+            // Escuta mudanças nos checkboxes para atualizar o resumo dinâmico e classe is-selected
+            const accordionsContainer = document.getElementById('novaTarefaAccordionGroup');
+            if (accordionsContainer) {
+                accordionsContainer.addEventListener('change', e => {
+                    const cb = e.target.closest('input[type="checkbox"]');
+                    if (!cb) return;
+
+                    const opt = cb.closest('.planner-assignee-option');
+                    if (opt) {
+                        opt.classList.toggle('is-selected', cb.checked);
+                    }
+                    atualizarResumosAcordeons();
+                });
+            }
+
+            atualizarResumosAcordeons();
+        }
+
+        inicializarAcordeonsAtribuicao();
+
         // Inicialização com a view definida na URL
         const urlParams = new URLSearchParams(window.location.search);
-        const initialView = urlParams.get('view') || state.currentView || 'kanban';
-        switchView(initialView, false);
+        const initialView = urlParams.get('view') || estado.visaoAtual || 'kanban';
+        trocarVisao(initialView, false);
     }
 })();

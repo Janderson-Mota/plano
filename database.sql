@@ -153,6 +153,23 @@ CREATE TABLE planner_tarefa_equipe (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
+-- 7.1 planner_tarefa_pessoas_soltas (Pessoas avulsas selecionadas N:N)
+-- =============================================================================
+CREATE TABLE planner_tarefa_pessoas_soltas (
+    tarefa_id     INT UNSIGNED    NOT NULL,
+    usuario_id    INT UNSIGNED    NOT NULL,
+    atribuido_em  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (tarefa_id, usuario_id),
+    CONSTRAINT fk_tps_tarefa
+        FOREIGN KEY (tarefa_id) REFERENCES planner_tarefa (id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_tps_usuario
+        FOREIGN KEY (usuario_id) REFERENCES planner_usuario (id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
 -- 8. planner_comentario
 -- =============================================================================
 CREATE TABLE planner_comentario (

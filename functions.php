@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 date_default_timezone_set('America/Sao_Paulo');
 
@@ -207,10 +206,12 @@ function plannerGetTarefas(mixed $arg1 = [], array $arg2 = []): array
 
     $sql = "SELECT t.id, t.titulo, t.descricao, t.coluna_id, t.prioridade, t.prazo, t.criado_por,
                    GROUP_CONCAT(DISTINCT gt.usuario_id) AS resp_ids,
-                   GROUP_CONCAT(DISTINCT te.equipe_id) AS eq_ids
+                   GROUP_CONCAT(DISTINCT te.equipe_id) AS eq_ids,
+                   GROUP_CONCAT(DISTINCT tps.usuario_id) AS ps_ids
             FROM planner_tarefa t
             LEFT JOIN planner_grupo_tarefa gt ON gt.tarefa_id = t.id
             LEFT JOIN planner_tarefa_equipe te ON te.tarefa_id = t.id
+            LEFT JOIN planner_tarefa_pessoas_soltas tps ON tps.tarefa_id = t.id
             {$whereSql}
             GROUP BY t.id
             ORDER BY t.coluna_id, t.id";
@@ -234,16 +235,17 @@ function plannerGetTarefas(mixed $arg1 = [], array $arg2 = []): array
     $tarefas = [];
     while ($r = $res->fetch_assoc()) {
         $tarefas[] = [
-            'id'           => (int) $r['id'],
-            'titulo'       => (string) $r['titulo'],
-            'descricao'    => (string) ($r['descricao'] ?? ''),
-            'coluna_id'    => (string) $r['coluna_id'],
-            'prioridade'   => (string) $r['prioridade'],
-            'prazo'        => $r['prazo'] ? (string) $r['prazo'] : null,
-            'criado_por'   => (int) $r['criado_por'],
-            'responsaveis' => $r['resp_ids'] ? array_map('intval', explode(',', $r['resp_ids'])) : [],
-            'equipes'      => $r['eq_ids'] ? array_map('intval', explode(',', $r['eq_ids'])) : [],
-            'status_prazo' => plannerCalcularStatusPrazo($r['prazo'], $r['coluna_id']),
+            'id'             => (int) $r['id'],
+            'titulo'         => (string) $r['titulo'],
+            'descricao'      => (string) ($r['descricao'] ?? ''),
+            'coluna_id'      => (string) $r['coluna_id'],
+            'prioridade'     => (string) $r['prioridade'],
+            'prazo'          => $r['prazo'] ? (string) $r['prazo'] : null,
+            'criado_por'     => (int) $r['criado_por'],
+            'responsaveis'   => $r['resp_ids'] ? array_map('intval', explode(',', $r['resp_ids'])) : [],
+            'equipes'        => $r['eq_ids'] ? array_map('intval', explode(',', $r['eq_ids'])) : [],
+            'pessoas_soltas' => $r['ps_ids'] ? array_map('intval', explode(',', $r['ps_ids'])) : [],
+            'status_prazo'   => plannerCalcularStatusPrazo($r['prazo'], $r['coluna_id']),
         ];
     }
 
@@ -506,8 +508,9 @@ function plannerActionCriarTarefa(array $body, array $usuarioAtual): never
     $colunaId     = plannerSanitizeStr($body['coluna_id'] ?? '', false, 40);
     $prioridade   = plannerSanitizeStr($body['prioridade'] ?? '', false, 10);
     $prazo        = plannerSanitizeStr($body['prazo'] ?? '', true, 10);
-    $responsaveis = plannerSanitizeIds($body['responsaveis'] ?? []);
-    $equipes      = plannerSanitizeIds($body['equipes'] ?? []);
+    $responsaveis  = plannerSanitizeIds($body['responsaveis'] ?? []);
+    $equipes       = plannerSanitizeIds($body['equipes'] ?? []);
+    $pessoasSoltas = plannerSanitizeIds($body['pessoas_soltas'] ?? []);
 
     if (empty($equipes) && !empty($body['equipe_id'])) {
         $eqId = plannerSanitizeInt($body['equipe_id']);
@@ -568,6 +571,14 @@ function plannerActionCriarTarefa(array $body, array $usuarioAtual): never
         }
     }
 
+    foreach ($pessoasSoltas as $psId) {
+        $sPs = $conn->prepare('INSERT INTO planner_tarefa_pessoas_soltas (tarefa_id, usuario_id) VALUES (?, ?)');
+        if ($sPs) {
+            $sPs->bind_param('ii', $novaId, $psId);
+            $sPs->execute();
+        }
+    }
+
     $sAtiv = $conn->prepare('INSERT INTO planner_atividade (tarefa_id, usuario_id, tipo, criado_em) VALUES (?, ?, "criacao", ?)');
     if ($sAtiv) {
         $sAtiv->bind_param('iis', $novaId, $criadorId, $agora);
@@ -575,18 +586,19 @@ function plannerActionCriarTarefa(array $body, array $usuarioAtual): never
     }
 
     $novaTarefa = [
-        'id'           => $novaId,
-        'titulo'       => $titulo,
-        'descricao'    => $descricao,
-        'coluna_id'    => $colunaId,
-        'prioridade'   => $prioridade,
-        'prazo'        => ($prazo !== '' && $prazo !== null) ? $prazo : null,
-        'criado_por'   => $criadorId,
-        'responsaveis' => $responsaveis,
-        'equipes'      => $equipes,
-        'status_prazo' => plannerCalcularStatusPrazo($prazo, $colunaId),
-        'criado_em'    => $agora,
-        'atualizado_em'=> $agora,
+        'id'             => $novaId,
+        'titulo'         => $titulo,
+        'descricao'      => $descricao,
+        'coluna_id'      => $colunaId,
+        'prioridade'     => $prioridade,
+        'prazo'          => ($prazo !== '' && $prazo !== null) ? $prazo : null,
+        'criado_por'     => $criadorId,
+        'responsaveis'   => $responsaveis,
+        'equipes'        => $equipes,
+        'pessoas_soltas' => $pessoasSoltas,
+        'status_prazo'   => plannerCalcularStatusPrazo($prazo, $colunaId),
+        'criado_em'      => $agora,
+        'atualizado_em'  => $agora,
     ];
 
     plannerOk(['tarefa' => $novaTarefa]);
@@ -690,6 +702,112 @@ function plannerActionAtualizarResponsaveis(array $body, array $usuarioAtual): n
         'task_id'       => $taskId,
         'responsaveis'  => $responsaveis,
         'atualizado_em' => $agora,
+    ]);
+}
+
+function plannerActionAtualizarEquipes(array $body, array $usuarioAtual): never
+{
+    global $conn;
+    if (!$conn) {
+        plannerError('Sem conexão com o banco de dados.', 500);
+    }
+
+    $taskId  = plannerSanitizeInt($body['task_id'] ?? 0);
+    $equipes = plannerSanitizeIds($body['equipes'] ?? []);
+
+    if ($taskId <= 0) plannerError('task_id inválido.', 400);
+
+    $agora = plannerNow();
+    $usuarioId = (int) ($usuarioAtual['id'] ?? 0);
+    if ($usuarioId <= 0) {
+        $uAtual = plannerGetUsuarioAtual();
+        $usuarioId = (int) ($uAtual['id'] ?? 0);
+    }
+    if ($usuarioId <= 0) {
+        $uRes = $conn->query('SELECT id FROM planner_usuario ORDER BY id ASC LIMIT 1');
+        if ($uRes && $uRow = $uRes->fetch_assoc()) {
+            $usuarioId = (int) $uRow['id'];
+        }
+    }
+
+    $sDel = $conn->prepare('DELETE FROM planner_tarefa_equipe WHERE tarefa_id = ?');
+    if ($sDel) {
+        $sDel->bind_param('i', $taskId);
+        $sDel->execute();
+    }
+
+    foreach ($equipes as $eid) {
+        $sIns = $conn->prepare('INSERT INTO planner_tarefa_equipe (tarefa_id, equipe_id) VALUES (?, ?)');
+        if ($sIns) {
+            $sIns->bind_param('ii', $taskId, $eid);
+            $sIns->execute();
+        }
+    }
+
+    $sAtiv = $conn->prepare('INSERT INTO planner_atividade (tarefa_id, usuario_id, tipo, meta, criado_em) VALUES (?, ?, "equipes", ?, ?)');
+    if ($sAtiv) {
+        $meta = json_encode(['total' => count($equipes)]);
+        $sAtiv->bind_param('iiss', $taskId, $usuarioId, $meta, $agora);
+        $sAtiv->execute();
+    }
+
+    plannerOk([
+        'task_id'       => $taskId,
+        'equipes'       => $equipes,
+        'atualizado_em' => $agora,
+    ]);
+}
+
+function plannerActionAtualizarPessoasSoltas(array $body, array $usuarioAtual): never
+{
+    global $conn;
+    if (!$conn) {
+        plannerError('Sem conexão com o banco de dados.', 500);
+    }
+
+    $taskId        = plannerSanitizeInt($body['task_id'] ?? 0);
+    $pessoasSoltas = plannerSanitizeIds($body['pessoas_soltas'] ?? []);
+
+    if ($taskId <= 0) plannerError('task_id inválido.', 400);
+
+    $agora = plannerNow();
+    $usuarioId = (int) ($usuarioAtual['id'] ?? 0);
+    if ($usuarioId <= 0) {
+        $uAtual = plannerGetUsuarioAtual();
+        $usuarioId = (int) ($uAtual['id'] ?? 0);
+    }
+    if ($usuarioId <= 0) {
+        $uRes = $conn->query('SELECT id FROM planner_usuario ORDER BY id ASC LIMIT 1');
+        if ($uRes && $uRow = $uRes->fetch_assoc()) {
+            $usuarioId = (int) $uRow['id'];
+        }
+    }
+
+    $sDel = $conn->prepare('DELETE FROM planner_tarefa_pessoas_soltas WHERE tarefa_id = ?');
+    if ($sDel) {
+        $sDel->bind_param('i', $taskId);
+        $sDel->execute();
+    }
+
+    foreach ($pessoasSoltas as $uid) {
+        $sIns = $conn->prepare('INSERT INTO planner_tarefa_pessoas_soltas (tarefa_id, usuario_id) VALUES (?, ?)');
+        if ($sIns) {
+            $sIns->bind_param('ii', $taskId, $uid);
+            $sIns->execute();
+        }
+    }
+
+    $sAtiv = $conn->prepare('INSERT INTO planner_atividade (tarefa_id, usuario_id, tipo, meta, criado_em) VALUES (?, ?, "pessoas_soltas", ?, ?)');
+    if ($sAtiv) {
+        $meta = json_encode(['total' => count($pessoasSoltas)]);
+        $sAtiv->bind_param('iiss', $taskId, $usuarioId, $meta, $agora);
+        $sAtiv->execute();
+    }
+
+    plannerOk([
+        'task_id'        => $taskId,
+        'pessoas_soltas' => $pessoasSoltas,
+        'atualizado_em'  => $agora,
     ]);
 }
 
@@ -840,4 +958,18 @@ function plannerActionCriarEquipe(array $body, array $usuarioAtual): never
     ];
 
     plannerOk(['equipe' => $novaEquipe]);
+}
+
+function plannerActionObterComentarios(array $body, array $usuarioAtual): never
+{
+    $tarefaId = plannerSanitizeInt($body['tarefa_id'] ?? 0);
+    if ($tarefaId <= 0) {
+        plannerError('tarefa_id inválido.', 400);
+    }
+
+    $comentarios = plannerGetComentarios($tarefaId);
+    plannerOk([
+        'tarefa_id'   => $tarefaId,
+        'comentarios' => $comentarios,
+    ]);
 }

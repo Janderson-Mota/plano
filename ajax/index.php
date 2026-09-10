@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 require_once __DIR__ . '/../functions.php';
 
@@ -24,10 +23,14 @@ $usuarioAtual = $usuarioAtual ?? plannerGetUsuarioAtual();
 match($action) {
     'criar_tarefa'           => plannerActionCriarTarefa($body, $usuarioAtual),
     'criar_equipe'           => plannerActionCriarEquipe($body, $usuarioAtual),
-    'mover_tarefa'           => plannerActionMoverTarefa($body, $usuarioAtual),
-    'atualizar_responsaveis' => plannerActionAtualizarResponsaveis($body, $usuarioAtual),
-    'criar_comentario'       => plannerActionCriarComentario($body, $usuarioAtual),
+    'mover_tarefa'             => plannerActionMoverTarefa($body, $usuarioAtual),
+    'atualizar_equipes'        => plannerActionAtualizarEquipes($body, $usuarioAtual),
+    'atualizar_responsaveis'   => plannerActionAtualizarResponsaveis($body, $usuarioAtual),
+    'atualizar_pessoas_soltas' => plannerActionAtualizarPessoasSoltas($body, $usuarioAtual),
+    'obter_comentarios'        => plannerActionObterComentarios($body, $usuarioAtual),
+    'criar_comentario'         => plannerActionCriarComentario($body, $usuarioAtual),
     'editar_comentario'      => plannerActionEditarComentario($body, $usuarioAtual),
     'excluir_comentario'     => plannerActionExcluirComentario($body, $usuarioAtual),
     default                  => plannerError("Ação desconhecida: {$action}", 400),
 };
+
