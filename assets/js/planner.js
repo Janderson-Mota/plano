@@ -1,31 +1,38 @@
 /**
- * app.js — Orbit · Lógica Vanilla completa (Passo 3)
+ * planner.js — Planner · Script Unificado e Centralizado
  *
- * Funcionalidades:
- *  - Leitura do blob #orbit-data
- *  - Troca de visões [data-view] sincronizada com querystring
- *  - Sistema de filtros transversal (#orbit-filtros)
- *  - Drag and Drop Vanilla nativo + alternativa acessível por teclado (#orbit-mover-menu)
- *  - Modal de detalhes (#orbit-modal-tarefa) com grupo ad-hoc e comentários com timestamp relativo
- *  - Modal de criação de tarefa (#orbit-modal-nova-tarefa)
- *  - Busca global Spotlight (Ctrl+K / Cmd+K)
- *  - Dashboard com gráficos Chart.js
- *  - Exportação CSV (UTF-8 com BOM, delimitador ;)
+ * Módulo de Gestão de Equipes e Tarefas (Vanilla JS, DOM API, Fetch com CSRF)
+ *
+ * ESTRUTURA E SEÇÕES POR VISÃO/PÁGINA:
+ *  - § 1 · GERAL: Inicialização, Leitura de Dados (#planner-data) e API Fetch (ajax/index.php)
+ *  - § 2 · GERAL: Helpers de Dados, Formatação e Toasts
+ *  - § 3 · NAVEGAÇÃO: Gerenciamento de Visões (Kanban, Calendário, Dashboard, Lista, Minhas Tarefas)
+ *  - § 4 · BARRA DE FILTROS: Filtros Transversais Flutuantes (Busca, Multi-selects, Datas)
+ *  - § 5 · VISÃO 1 - KANBAN: Quadro de Tarefas & Drag and Drop Nativo (HTML5 DnD API)
+ *  - § 6 · VISÃO 1 - KANBAN: Menu de Movimentação Acessível por Teclado/Clique
+ *  - § 7 · MODAIS GLOBAIS: Detalhes da Tarefa, Grupo de Responsáveis e Atribuição
+ *  - § 8 · MODAIS GLOBAIS: Thread de Comentários (Criar, Editar, Excluir com Timestamps)
+ *  - § 9 · MODAIS GLOBAIS: Formulário de Nova Tarefa (#plannerFormNovaTarefa)
+ *  - § 10 · MODAIS GLOBAIS: Formulário de Nova Equipe (#plannerFormNovaEquipe)
+ *  - § 11 · RECURSOS GLOBAIS: Busca Rápida Spotlight (Ctrl+K / Cmd+K)
+ *  - § 12 · VISÃO 3 - DASHBOARD: Gráficos Interativos (Chart.js)
+ *  - § 13 · RECURSOS GLOBAIS: Exportação de Dados em CSV (UTF-8 com BOM)
+ *  - § 14 · VISÃO 2 - CALENDÁRIO: Navegação de Meses, Grid Dinâmico e Painel Offcanvas
  */
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', initOrbit);
+    document.addEventListener('DOMContentLoaded', initPlanner);
 
-    function initOrbit() {
-        const dataEl = document.getElementById('orbit-data');
+    function initPlanner() {
+        const dataEl = document.getElementById('planner-data');
         if (!dataEl) return;
 
         let initialData;
         try {
             initialData = JSON.parse(dataEl.textContent);
         } catch (e) {
-            console.error('Orbit: Falha ao interpretar JSON inicial:', e);
+            console.error('Planner: Falha ao interpretar JSON inicial:', e);
             return;
         }
 
@@ -47,22 +54,17 @@
                 dataFim: initialData.filtros?.data_fim || '',
                 prazo: initialData.filtros?.prazo || '',
             },
-            currentView: document.documentElement.dataset.orbitView || 'kanban',
+            currentView: document.documentElement.dataset.plannerView || 'kanban',
             activeCharts: {}
         };
 
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-        // ═══════════════════════════════════════════════════════════
-        // § 1 · COMUNICAÇÃO COM API (Fetch com CSRF)
-        // ═══════════════════════════════════════════════════════════
-        async function orbitApi(action, payload = {}) {
+        // Comunicação com API (POST JSON)
+        async function plannerApi(action, payload = {}) {
             try {
-                const response = await fetch('api.php', {
+                const response = await fetch('ajax/index.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ action, ...payload })
                 });
@@ -73,15 +75,13 @@
                 }
                 return result.data;
             } catch (err) {
-                console.error(`Orbit API [${action}]:`, err);
+                console.error(`Planner API [${action}]:`, err);
                 showToast(err.message || 'Ocorreu um erro na requisição.', 'danger');
                 throw err;
             }
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 2 · HELPERS DE DADOS & FORMATAÇÃO
-        // ═══════════════════════════════════════════════════════════
+        // 
         function getUsuario(id) {
             return state.usuarios.find(u => u.id === Number(id)) || null;
         }
@@ -157,17 +157,17 @@
         }
 
         function showToast(mensagem, tipo = 'primary') {
-            let container = document.getElementById('orbitToastContainer');
+            let container = document.getElementById('plannerToastContainer');
             if (!container) {
                 container = document.createElement('div');
-                container.id = 'orbitToastContainer';
+                container.id = 'plannerToastContainer';
                 container.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;pointer-events:none;';
                 document.body.appendChild(container);
             }
 
             const toast = document.createElement('div');
             toast.className = `alert alert-${tipo} py-2 px-3 m-0 shadow-lg`;
-            toast.style.cssText = 'pointer-events:auto;min-width:240px;border-radius:10px;font-size:.85rem;animation:orbitFadeIn 0.25s ease;';
+            toast.style.cssText = 'pointer-events:auto;min-width:240px;border-radius:10px;font-size:.85rem;animation:plannerFadeIn 0.25s ease;';
             toast.textContent = mensagem;
             container.appendChild(toast);
 
@@ -178,15 +178,13 @@
             }, 3500);
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 3 · GERENCIAMENTO DE VISÕES (Views)
-        // ═══════════════════════════════════════════════════════════
+        // 
         function switchView(viewName, updateUrl = true) {
             const validViews = ['kanban', 'calendario', 'dashboard', 'lista', 'minhas-tarefas'];
             if (!validViews.includes(viewName)) viewName = 'kanban';
 
             state.currentView = viewName;
-            document.documentElement.dataset.orbitView = viewName;
+            document.documentElement.dataset.plannerView = viewName;
 
             // Atualiza links de navegação
             document.querySelectorAll('[data-view-link]').forEach(link => {
@@ -196,7 +194,7 @@
             });
 
             // Atualiza containers de view
-            document.querySelectorAll('.orbit-view').forEach(viewEl => {
+            document.querySelectorAll('.planner-view').forEach(viewEl => {
                 const isActive = viewEl.dataset.view === viewName;
                 viewEl.classList.toggle('is-active', isActive);
             });
@@ -205,7 +203,7 @@
             if (viewName === 'dashboard') {
                 renderDashboardCharts();
             } else if (viewName === 'calendario') {
-                renderOrbitCalendar();
+                renderPlannerCalendar();
             }
 
             if (updateUrl) {
@@ -229,9 +227,7 @@
             switchView(viewFromUrl, false);
         });
 
-        // ═══════════════════════════════════════════════════════════
-        // § 4 · SISTEMA DE FILTROS TRANSVERSAL (Centralizado & Multi-select)
-        // ═══════════════════════════════════════════════════════════
+        // 
         const filtroTexto = document.getElementById('filtroTexto');
         const filtroDataInicio = document.getElementById('filtroDataInicio');
         const filtroDataFim = document.getElementById('filtroDataFim');
@@ -270,11 +266,14 @@
 
         // Fechar todos os dropdowns abertos
         function closeAllDropdowns() {
-            document.querySelectorAll('.orbit-multiselect').forEach(ms => {
+            document.querySelectorAll('.planner-multiselect').forEach(ms => {
                 ms.classList.remove('is-open');
-                const dd = ms.querySelector('.orbit-multiselect__dropdown');
-                if (dd) dd.hidden = true;
-                const btn = ms.querySelector('.orbit-multiselect__btn');
+                const dd = ms.querySelector('.planner-multiselect__dropdown');
+                if (dd) {
+                    dd.hidden = true;
+                    dd.setAttribute('hidden', '');
+                }
+                const btn = ms.querySelector('.planner-multiselect__btn');
                 if (btn) btn.setAttribute('aria-expanded', 'false');
             });
         }
@@ -296,6 +295,7 @@
                 if (!isOpen) {
                     container.classList.add('is-open');
                     dropdown.hidden = false;
+                    dropdown.removeAttribute('hidden');
                     btn.setAttribute('aria-expanded', 'true');
                 }
             });
@@ -305,10 +305,10 @@
                 e.stopPropagation();
             });
 
-            // Checkboxes
-            const checkboxes = dropdown.querySelectorAll(`input[name="${cfg.inputName}"]`);
+            // Checkboxes com delegação para suportar elementos criados dinamicamente
             function updateSelection() {
-                const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+                const currentBoxes = dropdown.querySelectorAll(`input[name="${cfg.inputName}"]`);
+                const checkedBoxes = Array.from(currentBoxes).filter(cb => cb.checked);
                 const values = checkedBoxes.map(cb => cfg.isNumber ? Number(cb.value) : cb.value);
                 state.filtros[cfg.key] = values;
 
@@ -323,23 +323,25 @@
                 syncFilters();
             }
 
-            checkboxes.forEach(cb => {
-                cb.addEventListener('change', updateSelection);
+            dropdown.addEventListener('change', e => {
+                if (e.target && e.target.matches(`input[name="${cfg.inputName}"]`)) {
+                    updateSelection();
+                }
             });
 
             // Botão Limpar específico deste dropdown
-            const clearLink = dropdown.querySelector('.orbit-multiselect__clear-link');
+            const clearLink = dropdown.querySelector('.planner-multiselect__clear-link');
             if (clearLink) {
                 clearLink.addEventListener('click', e => {
                     e.preventDefault();
-                    checkboxes.forEach(cb => { cb.checked = false; });
+                    dropdown.querySelectorAll(`input[name="${cfg.inputName}"]`).forEach(cb => { cb.checked = false; });
                     updateSelection();
                 });
             }
 
             // Marca checkboxes caso já haja valores pré-selecionados
             if (Array.isArray(state.filtros[cfg.key]) && state.filtros[cfg.key].length > 0) {
-                checkboxes.forEach(cb => {
+                dropdown.querySelectorAll(`input[name="${cfg.inputName}"]`).forEach(cb => {
                     const val = cfg.isNumber ? Number(cb.value) : cb.value;
                     if (state.filtros[cfg.key].includes(val)) {
                         cb.checked = true;
@@ -498,7 +500,7 @@
             window.history.replaceState({ view: state.currentView }, '', url);
 
             // Aplica na View Kanban
-            const cards = document.querySelectorAll('#orbit-board .task-card');
+            const cards = document.querySelectorAll('#planner-board .task-card');
             cards.forEach(card => {
                 const id = Number(card.dataset.taskId);
                 const tarefa = state.tarefas.find(t => t.id === id);
@@ -509,7 +511,7 @@
             updateColumnCounts();
 
             // Aplica na View Lista
-            const rows = document.querySelectorAll('#orbitTabelaBody .orbit-table__row');
+            const rows = document.querySelectorAll('#plannerTabelaBody .planner-table__row');
             let visiveisLista = 0;
             rows.forEach(row => {
                 const id = Number(row.dataset.taskId);
@@ -522,14 +524,16 @@
             const listaCount = document.getElementById('listaCount');
             if (listaCount) listaCount.textContent = `${visiveisLista} tarefa(s)`;
 
-            // Re-renderiza dashboard se estiver ativo
+            // Re-renderiza dashboard ou calendário se estiver ativo
             if (state.currentView === 'dashboard') {
                 renderDashboardCharts();
+            } else if (state.currentView === 'calendario') {
+                renderPlannerCalendar();
             }
         }
 
         function updateColumnCounts() {
-            document.querySelectorAll('#orbit-board .board-col').forEach(col => {
+            document.querySelectorAll('#planner-board .board-col').forEach(col => {
                 const colId = col.dataset.columnId;
                 const visibleCount = col.querySelectorAll(`.task-card:not([style*="display: none"])`).length;
                 const countBadge = col.querySelector(`[data-count-for="${colId}"]`);
@@ -537,10 +541,8 @@
             });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 5 · DRAG AND DROP (Vanilla DnD API)
-        // ═══════════════════════════════════════════════════════════
-        const board = document.getElementById('orbit-board');
+        // 
+        const board = document.getElementById('planner-board');
         if (board) {
             board.addEventListener('dragstart', e => {
                 const card = e.target.closest('.task-card');
@@ -588,7 +590,7 @@
                     updateColumnCounts();
 
                     try {
-                        await orbitApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
+                        await plannerApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
                         const tarefa = state.tarefas.find(t => t.id === taskId);
                         if (tarefa) tarefa.coluna_id = targetCol;
                         showToast('Tarefa movida com sucesso!', 'success');
@@ -605,10 +607,8 @@
             });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 6 · MENU DE MOVER ACESSÍVEL (Alternativa por Teclado/Clique)
-        // ═══════════════════════════════════════════════════════════
-        const moverMenu = document.getElementById('orbit-mover-menu');
+        // 
+        const moverMenu = document.getElementById('planner-mover-menu');
         let currentMoverBtn = null;
 
         document.addEventListener('click', e => {
@@ -636,7 +636,7 @@
             moverMenu.style.left = `${Math.min(rect.left, window.innerWidth - 220)}px`;
             moverMenu.removeAttribute('hidden');
 
-            const firstItem = moverMenu.querySelector('.orbit-move-menu__item');
+            const firstItem = moverMenu.querySelector('.planner-move-menu__item');
             if (firstItem) firstItem.focus();
         }
 
@@ -651,7 +651,7 @@
 
         if (moverMenu) {
             moverMenu.addEventListener('click', async e => {
-                const item = e.target.closest('.orbit-move-menu__item');
+                const item = e.target.closest('.planner-move-menu__item');
                 if (!item) return;
 
                 const taskId = Number(moverMenu.dataset.taskId);
@@ -671,7 +671,7 @@
                 }
 
                 try {
-                    await orbitApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
+                    await plannerApi('mover_tarefa', { task_id: taskId, coluna_id: targetCol });
                     const tarefa = state.tarefas.find(t => t.id === taskId);
                     if (tarefa) tarefa.coluna_id = targetCol;
                     showToast('Tarefa movida com sucesso!', 'success');
@@ -688,7 +688,7 @@
             });
 
             moverMenu.addEventListener('keydown', e => {
-                const items = Array.from(moverMenu.querySelectorAll('.orbit-move-menu__item'));
+                const items = Array.from(moverMenu.querySelectorAll('.planner-move-menu__item'));
                 const currentIndex = items.indexOf(document.activeElement);
 
                 if (e.key === 'ArrowDown') {
@@ -706,10 +706,8 @@
             });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 7 · MODAL: DETALHES DA TAREFA & COMENTÁRIOS
-        // ═══════════════════════════════════════════════════════════
-        const modalTarefaEl = document.getElementById('orbit-modal-tarefa');
+        // 
+        const modalTarefaEl = document.getElementById('planner-modal-tarefa');
         let modalTarefaInstance = null;
         if (modalTarefaEl && window.bootstrap?.Modal) {
             modalTarefaInstance = window.bootstrap.Modal.getOrCreateInstance(modalTarefaEl);
@@ -728,15 +726,15 @@
             const tarefa = state.tarefas.find(t => t.id === taskId);
             if (!tarefa) return;
 
-            const modalTitle = document.getElementById('orbitModalTarefaLabel');
-            const prioBadge = document.getElementById('orbitModalPrioBadge');
-            const colunaSpan = document.getElementById('orbitModalColuna')?.querySelector('span');
-            const prazoSpan = document.getElementById('orbitModalPrazo')?.querySelector('span');
-            const criadorSpan = document.getElementById('orbitModalCriador')?.querySelector('span');
-            const descP = document.getElementById('orbitModalDesc');
-            const assigneesDiv = document.getElementById('orbitModalAssignees');
-            const commentTarefaId = document.getElementById('orbitCommentTarefaId');
-            const btnMover = document.getElementById('orbitModalBtnMover');
+            const modalTitle = document.getElementById('plannerModalTarefaLabel');
+            const prioBadge = document.getElementById('plannerModalPrioBadge');
+            const colunaSpan = document.getElementById('plannerModalColuna')?.querySelector('span');
+            const prazoSpan = document.getElementById('plannerModalPrazo')?.querySelector('span');
+            const criadorSpan = document.getElementById('plannerModalCriador')?.querySelector('span');
+            const descP = document.getElementById('plannerModalDesc');
+            const assigneesDiv = document.getElementById('plannerModalAssignees');
+            const commentTarefaId = document.getElementById('plannerCommentTarefaId');
+            const btnMover = document.getElementById('plannerModalBtnMover');
 
             if (modalTitle) modalTitle.textContent = tarefa.titulo;
             if (prioBadge) {
@@ -753,7 +751,7 @@
 
             const criador = getUsuario(tarefa.criado_por);
             if (criadorSpan) {
-                criadorSpan.textContent = criador ? `Criado por ${criador.nome}` : 'Orbit';
+                criadorSpan.textContent = criador ? `Criado por ${criador.nome}` : 'Planner';
             }
 
             if (descP) {
@@ -783,14 +781,14 @@
             }
 
             // Preenche picker de responsáveis
-            const picker = document.getElementById('orbitAssigneePicker');
+            const picker = document.getElementById('plannerAssigneePicker');
             if (picker) {
                 picker.setAttribute('hidden', '');
                 const checkboxes = picker.querySelectorAll('input[name="resp_picker[]"]');
                 const resps = (tarefa.responsaveis || []).map(Number);
                 checkboxes.forEach(cb => {
                     cb.checked = resps.includes(Number(cb.value));
-                    cb.closest('.orbit-assignee-option')?.classList.toggle('is-selected', cb.checked);
+                    cb.closest('.planner-assignee-option')?.classList.toggle('is-selected', cb.checked);
                 });
             }
 
@@ -802,7 +800,7 @@
 
         // Edição de responsáveis no modal de detalhe
         const btnEditarResp = document.getElementById('btnEditarResponsaveis');
-        const picker = document.getElementById('orbitAssigneePicker');
+        const picker = document.getElementById('plannerAssigneePicker');
         const btnSalvarResp = document.getElementById('btnSalvarResponsaveis');
         const btnCancelarResp = document.getElementById('btnCancelarResponsaveis');
 
@@ -822,14 +820,14 @@
 
         if (btnSalvarResp && picker) {
             btnSalvarResp.addEventListener('click', async () => {
-                const taskId = Number(document.getElementById('orbitCommentTarefaId')?.value);
+                const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
                 if (!taskId) return;
 
                 const selecionados = Array.from(picker.querySelectorAll('input[name="resp_picker[]"]:checked'))
                     .map(cb => Number(cb.value));
 
                 try {
-                    await orbitApi('atualizar_responsaveis', { task_id: taskId, responsaveis: selecionados });
+                    await plannerApi('atualizar_responsaveis', { task_id: taskId, responsaveis: selecionados });
                     const tarefa = state.tarefas.find(t => t.id === taskId);
                     if (tarefa) {
                         tarefa.responsaveis = selecionados;
@@ -846,16 +844,14 @@
                     if (btnEditarResp) btnEditarResp.style.display = '';
                     openTaskDetail(taskId);
                 } catch (err) {
-                    // Erro tratado por orbitApi
+                    // Erro tratado por plannerApi
                 }
             });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 8 · COMENTÁRIOS DA TAREFA
-        // ═══════════════════════════════════════════════════════════
+        // 
         function renderTaskComments(taskId) {
-            const container = document.getElementById('orbitCommentThread');
+            const container = document.getElementById('plannerCommentThread');
             if (!container) return;
 
             const coms = state.comentarios.filter(c => c.tarefa_id === taskId);
@@ -871,26 +867,26 @@
                 const isAuthor = Number(c.usuario_id) === Number(state.usuarioAtual.id);
 
                 const item = document.createElement('div');
-                item.className = 'orbit-comment';
+                item.className = 'planner-comment';
                 item.dataset.comentarioId = String(c.id);
 
                 item.innerHTML = `
-                    <div class="orbit-comment__avatar">
+                    <div class="planner-comment__avatar">
                         <span class="avatar avatar-sm rounded-circle" style="background:${autor?.cor || '#6366f1'}">
                             ${escapeHtml(autor?.iniciais || '?')}
                         </span>
                     </div>
-                    <div class="orbit-comment__content">
-                        <div class="orbit-comment__header">
-                            <span class="orbit-comment__author">${escapeHtml(autor?.nome || 'Usuário')}</span>
-                            <span class="orbit-comment__time">${formatRelativeTime(c.criado_em)}${c.editado_em ? ' <em class="text-muted">(editado)</em>' : ''}</span>
+                    <div class="planner-comment__content">
+                        <div class="planner-comment__header">
+                            <span class="planner-comment__author">${escapeHtml(autor?.nome || 'Usuário')}</span>
+                            <span class="planner-comment__time">${formatRelativeTime(c.criado_em)}${c.editado_em ? ' <em class="text-muted">(editado)</em>' : ''}</span>
                             ${isAuthor ? `
-                            <div class="orbit-comment__actions ms-auto">
+                            <div class="planner-comment__actions ms-auto">
                                 <button type="button" class="btn btn-link btn-sm p-0 text-muted me-2" data-comment-action="edit">Editar</button>
                                 <button type="button" class="btn btn-link btn-sm p-0 text-danger" data-comment-action="delete">Excluir</button>
                             </div>` : ''}
                         </div>
-                        <div class="orbit-comment__body">${escapeHtml(c.texto)}</div>
+                        <div class="planner-comment__body">${escapeHtml(c.texto)}</div>
                     </div>
                 `;
 
@@ -898,12 +894,12 @@
             });
         }
 
-        const commentForm = document.getElementById('orbitCommentForm');
+        const commentForm = document.getElementById('plannerCommentForm');
         if (commentForm) {
             commentForm.addEventListener('submit', async e => {
                 e.preventDefault();
-                const taskId = Number(document.getElementById('orbitCommentTarefaId')?.value);
-                const textInput = document.getElementById('orbitCommentText');
+                const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
+                const textInput = document.getElementById('plannerCommentText');
                 const texto = textInput?.value.trim();
 
                 if (!taskId || !texto) return;
@@ -912,7 +908,7 @@
                 if (submitBtn) submitBtn.disabled = true;
 
                 try {
-                    const res = await orbitApi('criar_comentario', { tarefa_id: taskId, texto });
+                    const res = await plannerApi('criar_comentario', { tarefa_id: taskId, texto });
                     if (res?.comentario) {
                         state.comentarios.push(res.comentario);
                         renderTaskComments(taskId);
@@ -926,10 +922,10 @@
         }
 
         // Editar/Excluir comentário (delegação)
-        document.getElementById('orbitCommentThread')?.addEventListener('click', async e => {
+        document.getElementById('plannerCommentThread')?.addEventListener('click', async e => {
             const editBtn = e.target.closest('[data-comment-action="edit"]');
             const delBtn = e.target.closest('[data-comment-action="delete"]');
-            const commentEl = e.target.closest('.orbit-comment');
+            const commentEl = e.target.closest('.planner-comment');
             if (!commentEl) return;
 
             const comId = Number(commentEl.dataset.comentarioId);
@@ -939,13 +935,13 @@
             if (delBtn) {
                 if (!confirm('Deseja realmente excluir este comentário?')) return;
                 try {
-                    await orbitApi('excluir_comentario', { comentario_id: comId });
+                    await plannerApi('excluir_comentario', { comentario_id: comId });
                     state.comentarios = state.comentarios.filter(c => c.id !== comId);
                     renderTaskComments(comentario.tarefa_id);
                     showToast('Comentário excluído!', 'info');
                 } catch (err) {}
             } else if (editBtn) {
-                const bodyEl = commentEl.querySelector('.orbit-comment__body');
+                const bodyEl = commentEl.querySelector('.planner-comment__body');
                 if (!bodyEl) return;
 
                 const textoOriginal = comentario.texto;
@@ -967,7 +963,7 @@
                     const novoTexto = bodyEl.querySelector('textarea')?.value.trim();
                     if (!novoTexto) return;
                     try {
-                        const res = await orbitApi('editar_comentario', { comentario_id: comId, texto: novoTexto });
+                        const res = await plannerApi('editar_comentario', { comentario_id: comId, texto: novoTexto });
                         comentario.texto = novoTexto;
                         comentario.editado_em = res?.editado_em || new Date().toISOString();
                         renderTaskComments(comentario.tarefa_id);
@@ -978,7 +974,7 @@
         });
 
         function renderTaskActivities(taskId) {
-            const container = document.getElementById('orbitActivityLog');
+            const container = document.getElementById('plannerActivityLog');
             if (!container) return;
 
             const acts = state.atividades.filter(a => a.tarefa_id === taskId);
@@ -992,7 +988,7 @@
             acts.forEach(a => {
                 const user = getUsuario(a.usuario_id);
                 const li = document.createElement('li');
-                li.className = 'orbit-activity-log__item';
+                li.className = 'planner-activity-log__item';
 
                 let desc = 'realizou uma alteração';
                 if (a.tipo === 'criacao') desc = 'criou a tarefa';
@@ -1007,20 +1003,18 @@
                 }
 
                 li.innerHTML = `
-                    <span class="orbit-activity-log__dot"></span>
-                    <div class="orbit-activity-log__content">
+                    <span class="planner-activity-log__dot"></span>
+                    <div class="planner-activity-log__content">
                         <strong>${escapeHtml(user?.nome || 'Usuário')}</strong> ${escapeHtml(desc)}
-                        <span class="orbit-activity-log__date">${formatRelativeTime(a.criado_em)}</span>
+                        <span class="planner-activity-log__date">${formatRelativeTime(a.criado_em)}</span>
                     </div>
                 `;
                 container.appendChild(li);
             });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 9 · FORMULÁRIO: NOVA TAREFA
-        // ═══════════════════════════════════════════════════════════
-        const formNova = document.getElementById('orbitFormNovaTarefa');
+        // 
+        const formNova = document.getElementById('plannerFormNovaTarefa');
         if (formNova) {
             formNova.addEventListener('submit', async e => {
                 e.preventDefault();
@@ -1050,11 +1044,11 @@
                     equipes: Array.from(teamCheckboxes).map(cb => Number(cb.value))
                 };
 
-                const submitBtn = document.getElementById('orbitBtnCriarTarefa');
+                const submitBtn = document.getElementById('plannerBtnCriarTarefa');
                 if (submitBtn) submitBtn.disabled = true;
 
                 try {
-                    const res = await orbitApi('criar_tarefa', payload);
+                    const res = await plannerApi('criar_tarefa', payload);
                     if (res?.tarefa) {
                         res.tarefa.status_prazo = calcularStatusPrazo(res.tarefa.prazo);
                         state.tarefas.push(res.tarefa);
@@ -1068,12 +1062,112 @@
                         }
 
                         // Fecha modal
-                        const modalEl = document.getElementById('orbit-modal-nova-tarefa');
+                        const modalEl = document.getElementById('planner-modal-nova-tarefa');
                         if (modalEl && window.bootstrap?.Modal) {
                             window.bootstrap.Modal.getInstance(modalEl)?.hide();
                         }
                         formNova.reset();
                         showToast('Nova tarefa criada com sucesso!', 'success');
+                    }
+                } finally {
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
+        }
+
+        // 
+        const formNovaEquipe = document.getElementById('plannerFormNovaEquipe');
+        if (formNovaEquipe) {
+            // Sincronizar swatches com input de cor
+            const swatches = formNovaEquipe.querySelectorAll('input[name="cor_preset"]');
+            const customColorInput = document.getElementById('novaEquipeCor');
+
+            swatches.forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (radio.checked && customColorInput) {
+                        customColorInput.value = radio.value;
+                    }
+                });
+            });
+
+            if (customColorInput) {
+                customColorInput.addEventListener('input', () => {
+                    swatches.forEach(radio => {
+                        radio.checked = (radio.value.toLowerCase() === customColorInput.value.toLowerCase());
+                    });
+                });
+            }
+
+            formNovaEquipe.addEventListener('submit', async e => {
+                e.preventDefault();
+
+                const nomeInput = document.getElementById('novaEquipeNome');
+                const paiSelect = document.getElementById('novaEquipePai');
+                const corInput = document.getElementById('novaEquipeCor');
+                const membrosCheckboxes = formNovaEquipe.querySelectorAll('input[name="membros[]"]:checked');
+
+                const nome = nomeInput?.value.trim();
+                if (!nome) {
+                    nomeInput?.classList.add('is-invalid');
+                    return;
+                }
+                nomeInput?.classList.remove('is-invalid');
+
+                const paiId = paiSelect?.value ? Number(paiSelect.value) : null;
+                const cor = corInput?.value || '#10B981';
+                const membros = Array.from(membrosCheckboxes).map(cb => Number(cb.value));
+
+                const submitBtn = document.getElementById('plannerBtnCriarEquipe');
+                if (submitBtn) submitBtn.disabled = true;
+
+                try {
+                    const res = await plannerApi('criar_equipe', { nome, cor, pai_id: paiId, membros });
+                    if (res?.equipe) {
+                        const novaEquipe = res.equipe;
+                        state.equipes.push(novaEquipe);
+
+                        // 1. Injeta no dropdown multi-select de Equipes
+                        const msList = document.querySelector('#dropdownFiltroEquipes .planner-multiselect__list');
+                        if (msList) {
+                            const label = document.createElement('label');
+                            label.className = 'planner-multiselect__item';
+                            label.dataset.teamId = String(novaEquipe.id);
+                            label.innerHTML = `
+                                <input type="checkbox" name="filtro_equipes[]" value="${novaEquipe.id}">
+                                <span class="planner-multiselect__check-custom"></span>
+                                <span class="planner-multiselect__text">${escapeHtml(novaEquipe.nome)}</span>
+                            `;
+                            msList.appendChild(label);
+                        }
+
+                        // 2. Injeta no picker de equipes do modal de Nova Tarefa
+                        const teamsPicker = document.getElementById('novaTarefaTeamsPicker') || document.querySelector('.planner-teams-picker');
+                        if (teamsPicker) {
+                            const opt = document.createElement('label');
+                            opt.className = 'planner-team-option';
+                            opt.dataset.teamId = String(novaEquipe.id);
+                            opt.innerHTML = `
+                                <input type="checkbox" name="equipes[]" value="${novaEquipe.id}">
+                                <span>${escapeHtml(novaEquipe.nome)}</span>
+                            `;
+                            teamsPicker.appendChild(opt);
+                        }
+
+                        // 3. Injeta no select de equipe pai no próprio modal de Nova Equipe
+                        if (paiSelect) {
+                            const newOption = document.createElement('option');
+                            newOption.value = String(novaEquipe.id);
+                            newOption.textContent = novaEquipe.nome;
+                            paiSelect.appendChild(newOption);
+                        }
+
+                        // Fecha o modal
+                        const modalEl = document.getElementById('planner-modal-nova-equipe');
+                        if (modalEl && window.bootstrap?.Modal) {
+                            window.bootstrap.Modal.getInstance(modalEl)?.hide();
+                        }
+                        formNovaEquipe.reset();
+                        showToast(`Equipe "${novaEquipe.nome}" criada com sucesso!`, 'success');
                     }
                 } finally {
                     if (submitBtn) submitBtn.disabled = false;
@@ -1132,12 +1226,10 @@
             return article;
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 10 · BUSCA GLOBAL (Spotlight Ctrl+K / Cmd+K)
-        // ═══════════════════════════════════════════════════════════
-        const spotlight = document.getElementById('orbit-busca-global');
-        const spotlightInput = document.getElementById('orbitSpotlightInput');
-        const spotlightResults = document.getElementById('orbitSpotlightResults');
+        // 
+        const spotlight = document.getElementById('planner-busca-global');
+        const spotlightInput = document.getElementById('plannerSpotlightInput');
+        const spotlightResults = document.getElementById('plannerSpotlightResults');
         const btnSpotlight = document.getElementById('btnSpotlight');
 
         function openSpotlight() {
@@ -1165,7 +1257,7 @@
 
         if (btnSpotlight) btnSpotlight.addEventListener('click', openSpotlight);
 
-        document.getElementById('orbitSpotlightBackdrop')?.addEventListener('click', closeSpotlight);
+        document.getElementById('plannerSpotlightBackdrop')?.addEventListener('click', closeSpotlight);
 
         if (spotlightInput) {
             spotlightInput.addEventListener('input', () => {
@@ -1173,8 +1265,8 @@
             });
 
             spotlightInput.addEventListener('keydown', e => {
-                const items = Array.from(spotlightResults?.querySelectorAll('.orbit-spotlight__item') || []);
-                const current = spotlightResults?.querySelector('.orbit-spotlight__item.is-selected');
+                const items = Array.from(spotlightResults?.querySelectorAll('.planner-spotlight__item') || []);
+                const current = spotlightResults?.querySelector('.planner-spotlight__item.is-selected');
                 let index = items.indexOf(current);
 
                 if (e.key === 'ArrowDown') {
@@ -1206,7 +1298,7 @@
 
             if (!query) {
                 spotlightResults.innerHTML = `
-                    <li class="orbit-spotlight__hint" role="option">
+                    <li class="planner-spotlight__hint" role="option">
                         <i class="bi bi-lightbulb" aria-hidden="true"></i>
                         Digite para buscar tarefas, pessoas ou equipes...
                     </li>
@@ -1229,7 +1321,7 @@
 
             if (matchingTasks.length === 0 && matchingUsers.length === 0 && matchingEquipes.length === 0) {
                 spotlightResults.innerHTML = `
-                    <li class="orbit-spotlight__hint" role="option">
+                    <li class="planner-spotlight__hint" role="option">
                         <i class="bi bi-emoji-neutral" aria-hidden="true"></i>
                         Nenhum resultado encontrado para «${escapeHtml(query)}».
                     </li>
@@ -1240,13 +1332,13 @@
             // Seção Tarefas
             if (matchingTasks.length > 0) {
                 const groupHeader = document.createElement('li');
-                groupHeader.className = 'orbit-spotlight__group-header text-muted small px-3 py-1';
+                groupHeader.className = 'planner-spotlight__group-header text-muted small px-3 py-1';
                 groupHeader.textContent = 'Tarefas';
                 spotlightResults.appendChild(groupHeader);
 
                 matchingTasks.forEach(t => {
                     const li = document.createElement('li');
-                    li.className = 'orbit-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
+                    li.className = 'planner-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
                     li.innerHTML = `
                         <i class="bi bi-check2-circle text-primary"></i>
                         <span class="flex-fill text-truncate">${escapeHtml(t.titulo)}</span>
@@ -1263,13 +1355,13 @@
             // Seção Pessoas
             if (matchingUsers.length > 0) {
                 const groupHeader = document.createElement('li');
-                groupHeader.className = 'orbit-spotlight__group-header text-muted small px-3 py-1 mt-2';
+                groupHeader.className = 'planner-spotlight__group-header text-muted small px-3 py-1 mt-2';
                 groupHeader.textContent = 'Pessoas';
                 spotlightResults.appendChild(groupHeader);
 
                 matchingUsers.forEach(u => {
                     const li = document.createElement('li');
-                    li.className = 'orbit-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
+                    li.className = 'planner-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
                     li.innerHTML = `
                         <span class="avatar avatar-xs rounded-circle" style="background:${u.cor}">${escapeHtml(u.iniciais)}</span>
                         <span class="flex-fill text-truncate">${escapeHtml(u.nome)} <small class="text-muted">(${escapeHtml(u.cargo)})</small></span>
@@ -1287,13 +1379,13 @@
             // Seção Equipes
             if (matchingEquipes.length > 0) {
                 const groupHeader = document.createElement('li');
-                groupHeader.className = 'orbit-spotlight__group-header text-muted small px-3 py-1 mt-2';
+                groupHeader.className = 'planner-spotlight__group-header text-muted small px-3 py-1 mt-2';
                 groupHeader.textContent = 'Equipes';
                 spotlightResults.appendChild(groupHeader);
 
                 matchingEquipes.forEach(eq => {
                     const li = document.createElement('li');
-                    li.className = 'orbit-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
+                    li.className = 'planner-spotlight__item p-2 px-3 d-flex align-items-center gap-2 cursor-pointer';
                     li.innerHTML = `
                         <i class="bi bi-people text-info"></i>
                         <span class="flex-fill text-truncate">${escapeHtml(eq.nome)}</span>
@@ -1308,13 +1400,11 @@
                 });
             }
 
-            const firstResult = spotlightResults.querySelector('.orbit-spotlight__item');
+            const firstResult = spotlightResults.querySelector('.planner-spotlight__item');
             if (firstResult) firstResult.classList.add('is-selected');
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 11 · DASHBOARD: GRÁFICOS (Chart.js)
-        // ═══════════════════════════════════════════════════════════
+        // 
         function renderDashboardCharts() {
             if (typeof Chart === 'undefined') return;
 
@@ -1427,9 +1517,7 @@
             }
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 12 · EXPORTAÇÃO CSV (UTF-8 com BOM, delimitador ;)
-        // ═══════════════════════════════════════════════════════════
+        // 
         const btnExportCSV = document.getElementById('btnExportCSV');
         if (btnExportCSV) {
             btnExportCSV.addEventListener('click', () => {
@@ -1457,7 +1545,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `orbit_tarefas_${new Date().toISOString().split('T')[0]}.csv`;
+                a.download = `planner_tarefas_${new Date().toISOString().split('T')[0]}.csv`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -1466,30 +1554,239 @@
             });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // § 13 · CALENDÁRIO NA VIEW ORBIT
-        // ═══════════════════════════════════════════════════════════
-        function renderOrbitCalendar() {
-            const grid = document.getElementById('orbitCalendarGrid');
+        // 
+        const MESES_PT = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+
+        const calLabel = document.getElementById('calendarLabel');
+        let calAno = calLabel?.dataset.year ? parseInt(calLabel.dataset.year, 10) : new Date().getFullYear();
+        let calMes = calLabel?.dataset.month ? parseInt(calLabel.dataset.month, 10) : (new Date().getMonth() + 1);
+
+        const btnCalAnterior = document.getElementById('calBtnAnterior');
+        const btnCalProximo = document.getElementById('calBtnProximo');
+        const btnCalHoje = document.getElementById('calBtnHoje');
+        const offcanvasDiaEl = document.getElementById('plannerOffcanvasDia');
+        const offcanvasDiaTitle = document.getElementById('offcanvasDiaLabel');
+        const offcanvasDiaBody = document.getElementById('plannerOffcanvasDiaBody');
+
+        if (btnCalAnterior) {
+            btnCalAnterior.addEventListener('click', () => {
+                calMes--;
+                if (calMes < 1) {
+                    calMes = 12;
+                    calAno--;
+                }
+                renderPlannerCalendar();
+            });
+        }
+
+        if (btnCalProximo) {
+            btnCalProximo.addEventListener('click', () => {
+                calMes++;
+                if (calMes > 12) {
+                    calMes = 1;
+                    calAno++;
+                }
+                renderPlannerCalendar();
+            });
+        }
+
+        if (btnCalHoje) {
+            btnCalHoje.addEventListener('click', () => {
+                const now = new Date();
+                calAno = now.getFullYear();
+                calMes = now.getMonth() + 1;
+                renderPlannerCalendar();
+            });
+        }
+
+        function formatCalDateIso(ano, mes, dia) {
+            return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        }
+
+        function formatCalDateLong(iso) {
+            const parts = iso.split('-');
+            if (parts.length !== 3) return iso;
+            const d = parseInt(parts[2], 10);
+            const m = parseInt(parts[1], 10);
+            const y = parts[0];
+            return `${d} de ${MESES_PT[m - 1]} de ${y}`;
+        }
+
+        function renderPlannerCalendar() {
+            const grid = document.getElementById('plannerCalendarGrid');
             const label = document.getElementById('calendarLabel');
             if (!grid || !label) return;
 
-            // Integração com os controles de mês já existentes
-            // Mantém os listeners de clique nos dias para abrir detalhes da tarefa
-            grid.querySelectorAll('.calendar-day').forEach(d => {
-                d.addEventListener('click', () => {
-                    const date = d.dataset.date;
-                    if (date) {
-                        const tarefasDoDia = state.tarefas.filter(t => t.prazo === date);
-                        if (tarefasDoDia.length === 1) {
-                            openTaskDetail(tarefasDoDia[0].id);
-                        } else if (tarefasDoDia.length > 1) {
-                            // Se houver mais de uma, abre a primeira ou detalhe
-                            openTaskDetail(tarefasDoDia[0].id);
-                        }
-                    }
+            // Atualiza o rótulo do mês/ano
+            label.textContent = `${MESES_PT[calMes - 1]} de ${calAno}`;
+            label.dataset.year = String(calAno);
+            label.dataset.month = String(calMes);
+
+            // Remove células de dias anteriores mantendo os 7 headers de dias da semana (.cal-weekday)
+            grid.querySelectorAll('.cal-day').forEach(el => el.remove());
+
+            const hojeIso = new Date().toISOString().split('T')[0];
+            const primeiroDiaSemana = new Date(calAno, calMes - 1, 1).getDay(); // 0 = Dom, 6 = Sáb
+            const diasNoMes = new Date(calAno, calMes, 0).getDate();
+
+            const fragment = document.createDocumentFragment();
+
+            // Células vazias de preenchimento antes do primeiro dia
+            for (let i = 0; i < primeiroDiaSemana; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'cal-day is-empty';
+                empty.setAttribute('aria-hidden', 'true');
+                fragment.appendChild(empty);
+            }
+
+            // Renderiza cada dia do mês
+            for (let d = 1; d <= diasNoMes; d++) {
+                const iso = formatCalDateIso(calAno, calMes, d);
+                const isHoje = (iso === hojeIso);
+
+                // Tarefas do dia que passam pelos filtros ativos
+                const tarefasDoDia = state.tarefas.filter(t => t.prazo === iso && taskMatchesFilters(t));
+                const numTs = tarefasDoDia.length;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `cal-day${isHoje ? ' is-today' : ''}`;
+                btn.dataset.date = iso;
+                btn.setAttribute('role', 'gridcell');
+                btn.setAttribute('aria-label', `${d} de ${MESES_PT[calMes - 1]}${numTs ? `, ${numTs} tarefa(s)` : ''}`);
+
+                const numSpan = document.createElement('span');
+                numSpan.className = 'cal-day__num';
+                numSpan.textContent = String(d);
+                btn.appendChild(numSpan);
+
+                const dotsSpan = document.createElement('span');
+                dotsSpan.className = 'cal-day__dots';
+                dotsSpan.setAttribute('aria-hidden', 'true');
+
+                // Renderiza até 3 dots de prioridade
+                tarefasDoDia.slice(0, 3).forEach(t => {
+                    const dot = document.createElement('span');
+                    dot.className = `cal-dot priority-${t.prioridade || 'media'}`;
+                    dot.title = t.titulo || '';
+                    dotsSpan.appendChild(dot);
                 });
-            });
+
+                // Se houver mais de 3 tarefas, exibe "+N"
+                if (numTs > 3) {
+                    const more = document.createElement('span');
+                    more.className = 'cal-day__more';
+                    more.textContent = `+${numTs - 3}`;
+                    dotsSpan.appendChild(more);
+                }
+
+                btn.appendChild(dotsSpan);
+
+                // Clique no dia abre o Offcanvas de detalhes do dia
+                btn.addEventListener('click', () => {
+                    openDayDetails(iso);
+                });
+
+                fragment.appendChild(btn);
+            }
+
+            grid.appendChild(fragment);
+        }
+
+        function openDayDetails(iso) {
+            if (!offcanvasDiaEl || !offcanvasDiaBody) return;
+
+            if (offcanvasDiaTitle) {
+                offcanvasDiaTitle.textContent = `Tarefas de ${formatCalDateLong(iso)}`;
+            }
+
+            // Tarefas deste dia (aplicando filtros atuais)
+            const tarefasDoDia = state.tarefas.filter(t => t.prazo === iso && taskMatchesFilters(t));
+            offcanvasDiaBody.innerHTML = '';
+
+            if (tarefasDoDia.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'planner-cal-empty-day text-center py-5';
+                empty.innerHTML = `
+                    <i class="bi bi-calendar-check fs-1 text-muted d-block mb-3" style="opacity: 0.5;"></i>
+                    <p class="text-muted small mb-0">Nenhuma tarefa com prazo para esta data.</p>
+                `;
+                offcanvasDiaBody.appendChild(empty);
+            } else {
+                const list = document.createElement('div');
+                list.className = 'planner-cal-task-list d-flex flex-column gap-2';
+
+                tarefasDoDia.forEach(t => {
+                    const coluna = getColuna(t.coluna_id);
+                    const prioMeta = {
+                        urgente: { rotulo: 'Urgente', classe: 'prio-urgente' },
+                        alta: { rotulo: 'Alta', classe: 'prio-alta' },
+                        media: { rotulo: 'Média', classe: 'prio-media' },
+                        baixa: { rotulo: 'Baixa', classe: 'prio-baixa' },
+                    }[t.prioridade] || { rotulo: t.prioridade, classe: 'prio-media' };
+
+                    const card = document.createElement('div');
+                    card.className = 'planner-cal-task-card p-3 rounded-3';
+                    card.style.cssText = 'background: var(--planner-surface-2); border: 1px solid var(--planner-border); cursor: pointer; transition: all 0.2s;';
+                    
+                    card.addEventListener('mouseenter', () => {
+                        card.style.borderColor = 'var(--planner-gold)';
+                        card.style.transform = 'translateY(-2px)';
+                    });
+                    card.addEventListener('mouseleave', () => {
+                        card.style.borderColor = 'var(--planner-border)';
+                        card.style.transform = 'none';
+                    });
+
+                    // Clicar na tarefa do dia abre o modal de detalhes
+                    card.addEventListener('click', () => {
+                        const bsOffcanvas = window.bootstrap?.Offcanvas?.getInstance(offcanvasDiaEl);
+                        if (bsOffcanvas) bsOffcanvas.hide();
+                        openTaskDetail(t.id);
+                    });
+
+                    // Renderiza avatares dos responsáveis
+                    let respsHtml = '';
+                    if (Array.isArray(t.responsaveis) && t.responsaveis.length > 0) {
+                        respsHtml = `<div class="avatar-stack">`;
+                        t.responsaveis.slice(0, 3).forEach(uid => {
+                            const u = getUsuario(uid);
+                            if (u) {
+                                respsHtml += `<span class="avatar avatar-xs" style="background-color: ${escapeHtml(u.cor)}" title="${escapeHtml(u.nome)}">${escapeHtml(u.iniciais)}</span>`;
+                            }
+                        });
+                        if (t.responsaveis.length > 3) {
+                            respsHtml += `<span class="avatar avatar-xs avatar--more">+${t.responsaveis.length - 3}</span>`;
+                        }
+                        respsHtml += `</div>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="planner-prio-tag ${prioMeta.classe}">${prioMeta.rotulo}</span>
+                            <span class="badge" style="background: rgba(255,255,255,0.06); color: ${coluna?.cor || '#94A3B8'}; font-size: 0.72rem;">${escapeHtml(coluna?.titulo || t.coluna_id)}</span>
+                        </div>
+                        <h6 class="mb-1 text-white fw-bold" style="font-size: 0.92rem;">${escapeHtml(t.titulo)}</h6>
+                        ${t.descricao ? `<p class="text-muted small mb-2" style="font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(t.descricao)}</p>` : ''}
+                        <div class="d-flex align-items-center justify-content-between mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.05);">
+                            <span class="text-muted small" style="font-size: 0.75rem;"><i class="bi bi-clock me-1"></i>${escapeHtml(iso)}</span>
+                            ${respsHtml}
+                        </div>
+                    `;
+
+                    list.appendChild(card);
+                });
+
+                offcanvasDiaBody.appendChild(list);
+            }
+
+            if (window.bootstrap?.Offcanvas) {
+                const instance = window.bootstrap.Offcanvas.getOrCreateInstance(offcanvasDiaEl);
+                instance.show();
+            }
         }
 
         // Inicialização com a view definida na URL
