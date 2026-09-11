@@ -1,12 +1,12 @@
 -- =============================================================================
 -- Planner · Módulo de Gestão de Equipes e Tarefas
--- database.sql — Versão 1: Campo de Identificação como `matricula`
+-- database_chave.sql — Versão 2: Campo de Identificação como `chave`
 -- =============================================================================
 -- 📌 NOTA DE CONFIGURAÇÃO DO IDENTIFICADOR DO USUÁRIO:
--- Este arquivo utiliza o campo `matricula` como identificador de usuário na tabela
--- `acesso_permitido`. Caso em seu banco de produção a coluna se chame `chave`,
--- utilize o arquivo alternativo `database_chave.sql` ou simplesmente altere o nome
--- do campo `matricula` para `chave` nas tabelas abaixo.
+-- Este arquivo utiliza o campo `chave` como identificador de usuário na tabela
+-- `acesso_permitido`. Caso em seu banco de produção a coluna se chame `matricula`,
+-- utilize o arquivo alternativo `database.sql` ou simplesmente altere o nome
+-- do campo `chave` para `matricula` nas tabelas abaixo.
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS `planner`
@@ -40,14 +40,14 @@ SET foreign_key_checks = 1;
 -- =============================================================================
 -- 1. acesso_permitido (Tabela de Usuários / Acessos)
 -- =============================================================================
--- 📌 CAMPO DE IDENTIFICAÇÃO: `matricula`
--- Se precisar mudar para `chave`, troque `matricula` por `chave` aqui e nas FKs.
+-- 📌 CAMPO DE IDENTIFICAÇÃO: `chave`
+-- Se precisar mudar para `matricula`, troque `chave` por `matricula` aqui e nas FKs.
 CREATE TABLE acesso_permitido (
-    matricula   VARCHAR(50)     NOT NULL, -- <<< CAMPO IDENTIFICADOR (matricula)
+    chave       VARCHAR(50)     NOT NULL, -- <<< CAMPO IDENTIFICADOR (chave)
     nome        VARCHAR(120)    NOT NULL,
     criado_em   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    PRIMARY KEY (matricula)
+    PRIMARY KEY (chave)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
@@ -82,7 +82,7 @@ CREATE TABLE planner_equipe (
         ON DELETE SET NULL
         ON UPDATE CASCADE,
     CONSTRAINT fk_equipe_lider
-        FOREIGN KEY (lider_id) REFERENCES acesso_permitido (matricula)
+        FOREIGN KEY (lider_id) REFERENCES acesso_permitido (chave)
         ON DELETE SET NULL
         ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -92,16 +92,16 @@ CREATE TABLE planner_equipe (
 -- =============================================================================
 CREATE TABLE planner_membro_equipe (
     equipe_id     INT UNSIGNED    NOT NULL,
-    matricula     VARCHAR(50)     NOT NULL, -- <<< FK para acesso_permitido(matricula)
+    chave         VARCHAR(50)     NOT NULL, -- <<< FK para acesso_permitido(chave)
     papel         ENUM('lider','membro') NOT NULL DEFAULT 'membro',
     adicionado_em DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    PRIMARY KEY (equipe_id, matricula),
+    PRIMARY KEY (equipe_id, chave),
     CONSTRAINT fk_membro_equipe
         FOREIGN KEY (equipe_id) REFERENCES planner_equipe (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_membro_acesso
-        FOREIGN KEY (matricula) REFERENCES acesso_permitido (matricula)
+        FOREIGN KEY (chave) REFERENCES acesso_permitido (chave)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -115,7 +115,7 @@ CREATE TABLE planner_tarefa (
     coluna_id     INT UNSIGNED     NOT NULL DEFAULT 1, -- <<< FK INT para planner_coluna(id)
     prioridade    ENUM('baixa','media','alta','urgente') NOT NULL DEFAULT 'media',
     prazo         DATE             NULL DEFAULT NULL,
-    criado_por    VARCHAR(50)      NOT NULL,           -- <<< FK para acesso_permitido(matricula)
+    criado_por    VARCHAR(50)      NOT NULL,           -- <<< FK para acesso_permitido(chave)
     criado_em     DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
     atualizado_em DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -127,7 +127,7 @@ CREATE TABLE planner_tarefa (
         FOREIGN KEY (coluna_id) REFERENCES planner_coluna (id)
         ON UPDATE CASCADE,
     CONSTRAINT fk_tarefa_criador
-        FOREIGN KEY (criado_por) REFERENCES acesso_permitido (matricula)
+        FOREIGN KEY (criado_por) REFERENCES acesso_permitido (chave)
         ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -136,15 +136,15 @@ CREATE TABLE planner_tarefa (
 -- =============================================================================
 CREATE TABLE planner_grupo_tarefa (
     tarefa_id     INT UNSIGNED    NOT NULL,
-    matricula     VARCHAR(50)     NOT NULL, -- <<< FK para acesso_permitido(matricula)
+    chave         VARCHAR(50)     NOT NULL, -- <<< FK para acesso_permitido(chave)
     atribuido_em  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    PRIMARY KEY (tarefa_id, matricula),
+    PRIMARY KEY (tarefa_id, chave),
     CONSTRAINT fk_gt_tarefa
         FOREIGN KEY (tarefa_id) REFERENCES planner_tarefa (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_gt_acesso
-        FOREIGN KEY (matricula) REFERENCES acesso_permitido (matricula)
+        FOREIGN KEY (chave) REFERENCES acesso_permitido (chave)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -170,15 +170,15 @@ CREATE TABLE planner_tarefa_equipe (
 -- =============================================================================
 CREATE TABLE planner_tarefa_pessoas_soltas (
     tarefa_id     INT UNSIGNED    NOT NULL,
-    matricula     VARCHAR(50)     NOT NULL, -- <<< FK para acesso_permitido(matricula)
+    chave         VARCHAR(50)     NOT NULL, -- <<< FK para acesso_permitido(chave)
     atribuido_em  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    PRIMARY KEY (tarefa_id, matricula),
+    PRIMARY KEY (tarefa_id, chave),
     CONSTRAINT fk_tps_tarefa
         FOREIGN KEY (tarefa_id) REFERENCES planner_tarefa (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_tps_acesso
-        FOREIGN KEY (matricula) REFERENCES acesso_permitido (matricula)
+        FOREIGN KEY (chave) REFERENCES acesso_permitido (chave)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -188,7 +188,7 @@ CREATE TABLE planner_tarefa_pessoas_soltas (
 CREATE TABLE planner_comentario (
     id          INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     tarefa_id   INT UNSIGNED     NOT NULL,
-    matricula   VARCHAR(50)      NOT NULL, -- <<< FK para acesso_permitido(matricula)
+    chave       VARCHAR(50)      NOT NULL, -- <<< FK para acesso_permitido(chave)
     texto       TEXT             NOT NULL,
     criado_em   DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
     editado_em  DATETIME         NULL DEFAULT NULL,
@@ -199,7 +199,7 @@ CREATE TABLE planner_comentario (
         FOREIGN KEY (tarefa_id) REFERENCES planner_tarefa (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_comentario_acesso
-        FOREIGN KEY (matricula) REFERENCES acesso_permitido (matricula)
+        FOREIGN KEY (chave) REFERENCES acesso_permitido (chave)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -209,7 +209,7 @@ CREATE TABLE planner_comentario (
 CREATE TABLE planner_atividade (
     id          INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     tarefa_id   INT UNSIGNED     NOT NULL,
-    matricula   VARCHAR(50)      NOT NULL, -- <<< FK para acesso_permitido(matricula)
+    chave       VARCHAR(50)      NOT NULL, -- <<< FK para acesso_permitido(chave)
     tipo        VARCHAR(40)      NOT NULL,
     meta        JSON             NULL DEFAULT NULL,
     criado_em   DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -220,7 +220,7 @@ CREATE TABLE planner_atividade (
         FOREIGN KEY (tarefa_id) REFERENCES planner_tarefa (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_atividade_acesso
-        FOREIGN KEY (matricula) REFERENCES acesso_permitido (matricula)
+        FOREIGN KEY (chave) REFERENCES acesso_permitido (chave)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -229,7 +229,7 @@ CREATE TABLE planner_atividade (
 -- =============================================================================
 
 -- Usuários em acesso_permitido
-INSERT INTO acesso_permitido (matricula, nome) VALUES
+INSERT INTO acesso_permitido (chave, nome) VALUES
 ('1001', 'Ana Ferreira'),
 ('1002', 'Bruno Costa'),
 ('1003', 'Carla Dias'),
@@ -245,6 +245,8 @@ INSERT INTO planner_coluna (id, slug, titulo, ordem, cor) VALUES
 (3, 'em-revisao',   'Em Revisão',   3, '#EAB308'),
 (4, 'concluido',    'Concluído',    4, '#10B981');
 
+-- Equipes
+INSERT INTO planner_equipe (id, nome, descricao, pai_id, cor) VALUES
 -- Equipes (com líder atribuído)
 INSERT INTO planner_equipe (id, nome, descricao, pai_id, lider_id, cor) VALUES
 (1, 'Produto Digital', 'Estratégia de produto e UX.',       NULL, '1007', '#EAB308'),
@@ -255,8 +257,8 @@ INSERT INTO planner_equipe (id, nome, descricao, pai_id, lider_id, cor) VALUES
 (6, 'Mobile',           'Versões nativas iOS/Android.',     3,    '1006', '#CA8A04'),
 (7, 'iOS',              'Desenvolvimento iOS nativo.',      6,    '1001', '#16A34A');
 
--- Membros de Equipe (equipe_id, matricula, papel)
-INSERT INTO planner_membro_equipe (equipe_id, matricula, papel) VALUES
+-- Membros de Equipe (equipe_id, chave, papel)
+INSERT INTO planner_membro_equipe (equipe_id, chave, papel) VALUES
 (1, '1007', 'lider'),
 (1, '1003', 'membro'),
 (2, '1002', 'lider'),
@@ -285,8 +287,8 @@ INSERT INTO planner_tarefa (id, titulo, descricao, coluna_id, prioridade, prazo,
 (11, 'Definir paleta de cores e tipografia',      'Estabelecer variáveis CSS claras com destaques em verde e amarelo.',               4, 'baixa',   '2026-08-29', '1003', '2026-08-26 14:30:00'),
 (12, 'Planejar sprint de calendário integrado',   'Alinhar escopo da visão de calendário com o time.',                                1, 'media',   '2026-09-22', '1007', '2026-09-07 17:00:00');
 
--- Responsáveis das Tarefas (tarefa_id, matricula)
-INSERT INTO planner_grupo_tarefa (tarefa_id, matricula) VALUES
+-- Responsáveis das Tarefas (tarefa_id, chave)
+INSERT INTO planner_grupo_tarefa (tarefa_id, chave) VALUES
 (1, '1002'), (1, '1005'),
 (2, '1003'),
 (3, '1003'), (3, '1001'),
@@ -316,19 +318,19 @@ INSERT INTO planner_tarefa_equipe (tarefa_id, equipe_id) VALUES
 (12, 1);
 
 -- Pessoas Avulsas (Exemplo Seed)
-INSERT INTO planner_tarefa_pessoas_soltas (tarefa_id, matricula) VALUES
+INSERT INTO planner_tarefa_pessoas_soltas (tarefa_id, chave) VALUES
 (6, '1005'),
 (8, '1006');
 
--- Comentários (tarefa_id, matricula, texto, criado_em)
-INSERT INTO planner_comentario (id, tarefa_id, matricula, texto, criado_em) VALUES
+-- Comentários (tarefa_id, chave, texto, criado_em)
+INSERT INTO planner_comentario (id, tarefa_id, chave, texto, criado_em) VALUES
 (1, 1, '1002', 'Alinhar o schema com os requisitos de relatório.',          '2026-09-01 10:00:00'),
 (2, 1, '1005', 'Rascunho do ERD preparado.',                               '2026-09-01 10:30:00'),
 (3, 4, '1002', 'Configurada sessão existente.',                            '2026-09-05 14:00:00'),
 (4, 5, '1001', 'DnD API funcionando perfeitamente em navegadores modernos.', '2026-09-07 11:00:00');
 
--- Atividades (tarefa_id, matricula, tipo, meta, criado_em)
-INSERT INTO planner_atividade (tarefa_id, matricula, tipo, meta, criado_em) VALUES
+-- Atividades (tarefa_id, chave, tipo, meta, criado_em)
+INSERT INTO planner_atividade (tarefa_id, chave, tipo, meta, criado_em) VALUES
 (5, '1001', 'criacao',       NULL,                               '2026-09-04 10:15:00'),
 (5, '1001', 'movimentacao',  '{\"de\":1,\"para\":2}',             '2026-09-07 09:30:00'),
 (1, '1002', 'criacao',       NULL,                               '2026-09-01 09:00:00'),

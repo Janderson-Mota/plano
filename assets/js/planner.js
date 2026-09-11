@@ -48,7 +48,7 @@
             filtros: {
                 texto: dadosIniciais.filtros?.texto || '',
                 equipes: dadosIniciais.filtros?.equipe ? [Number(dadosIniciais.filtros.equipe)] : [],
-                responsaveis: dadosIniciais.filtros?.usuario ? [Number(dadosIniciais.filtros.usuario)] : [],
+                responsaveis: dadosIniciais.filtros?.usuario ? [String(dadosIniciais.filtros.usuario)] : [],
                 prioridades: dadosIniciais.filtros?.prioridade ? [dadosIniciais.filtros.prioridade] : [],
                 dataInicio: dadosIniciais.filtros?.data_inicio || '',
                 dataFim: dadosIniciais.filtros?.data_fim || '',
@@ -58,8 +58,122 @@
             graficosAtivos: {}
         };
 
-        // Comunicação com API (POST JSON)
+        // =============================================================================
+        // § 1.1 · CONTROLE DE SPINNER DISCRETO INTERNO AO MODAL (NÃO GLOBAL)
+        // =============================================================================
+        let spinnerCounter = 0;
+
+        function mostrarSpinner(texto = 'Salvando...') {
+            spinnerCounter++;
+            // Identifica modal atualmente aberto
+            const activeModal = document.querySelector('.modal.show');
+            if (activeModal) {
+                let spinnerEl = activeModal.querySelector('.planner-modal-inline-spinner');
+                if (!spinnerEl) {
+                    spinnerEl = document.createElement('div');
+                    spinnerEl.className = 'planner-modal-inline-spinner ms-auto';
+                    spinnerEl.innerHTML = `
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <span class="planner-modal-spinner-label">${escaparHtml(texto)}</span>
+                    `;
+                    // Insere preferencialmente no modal-footer ou modal-header
+                    const footer = activeModal.querySelector('.modal-footer');
+                    const header = activeModal.querySelector('.modal-header');
+                    if (footer) {
+                        footer.prepend(spinnerEl);
+                    } else if (header) {
+                        header.appendChild(spinnerEl);
+                    } else {
+                        activeModal.querySelector('.modal-content')?.prepend(spinnerEl);
+                    }
+                } else {
+                    const lbl = spinnerEl.querySelector('.planner-modal-spinner-label');
+                    if (lbl) lbl.textContent = texto;
+                    spinnerEl.style.display = 'inline-flex';
+                }
+
+                // Desabilita botões de ação do modal enquanto processa para evitar cliques duplicados
+                activeModal.querySelectorAll('button[type="submit"], #plannerBtnExecutarConfirmacao, [data-action="salvar"]').forEach(btn => {
+                    btn.disabled = true;
+                });
+            }
+        }
+
+        function ocultarSpinner() {
+            spinnerCounter = Math.max(0, spinnerCounter - 1);
+            if (spinnerCounter === 0) {
+                document.querySelectorAll('.planner-modal-inline-spinner').forEach(el => el.remove());
+                document.querySelectorAll('.modal button:disabled').forEach(btn => {
+                    btn.disabled = false;
+                });
+            }
+        }
+
+        // HELPER GLOBAL DE CONFIRMAÇÃO EM MODAL (ELIMINA CONFIRM E ALERT NATIVOS)
+        function confirmarAcao({ titulo = 'Confirmar exclusão', mensagem = 'Tem certeza que deseja executar esta ação?', textoBotao = 'Confirmar', variante = 'danger' } = {}) {
+            return new Promise(resolve => {
+                const modalEl = document.getElementById('plannerModalConfirmacao');
+                if (!modalEl || !window.bootstrap?.Modal) {
+                    // Fallback de segurança se Bootstrap Modal não estiver carregado
+                    return resolve(false);
+                }
+
+                const tituloEl = document.getElementById('plannerModalConfirmacaoLabel');
+                const msgEl = document.getElementById('plannerConfirmMensagem');
+                const btnOk = document.getElementById('plannerBtnExecutarConfirmacao');
+                const btnCancel = document.getElementById('plannerBtnCancelarConfirmacao');
+                const iconWrap = document.getElementById('plannerConfirmIconWrap');
+                const icon = document.getElementById('plannerConfirmIcon');
+
+                if (tituloEl) tituloEl.textContent = titulo;
+                if (msgEl) msgEl.textContent = mensagem;
+
+                if (btnOk) {
+                    btnOk.textContent = textoBotao;
+                    btnOk.className = `btn btn-sm btn-${variante} px-3`;
+                }
+
+                if (iconWrap && icon) {
+                    if (variante === 'danger') {
+                        iconWrap.style.background = 'rgba(239, 68, 68, 0.1)';
+                        icon.className = 'bi bi-exclamation-triangle-fill text-danger fs-1';
+                    } else {
+                        iconWrap.style.background = 'rgba(16, 185, 129, 0.1)';
+                        icon.className = 'bi bi-info-circle-fill text-success fs-1';
+                    }
+                }
+
+                const bsModal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+
+                let responded = false;
+                function onConfirm() {
+                    responded = true;
+                    bsModal.hide();
+                    resolve(true);
+                }
+
+                function onCancel() {
+                    if (!responded) {
+                        responded = true;
+                        resolve(false);
+                    }
+                }
+
+                // Remove listeners anteriores
+                const newBtnOk = btnOk.cloneNode(true);
+                btnOk.parentNode.replaceChild(newBtnOk, btnOk);
+                newBtnOk.addEventListener('click', onConfirm);
+
+                modalEl.addEventListener('hidden.bs.modal', onCancel, { once: true });
+                bsModal.show();
+            });
+        }
+
+        // Comunicação com API (POST JSON com Spinner Visível)
         async function chamarApi(action, payload = {}) {
+            mostrarSpinner();
             try {
                 const response = await fetch('ajax/index.php', {
                     method: 'POST',
@@ -78,16 +192,30 @@
                 console.error(`Planner API [${action}]:`, err);
                 exibirToast(err.message || 'Ocorreu um erro na requisição.', 'danger');
                 throw err;
+            } finally {
+                ocultarSpinner();
             }
         }
 
-        // 
+        // Helper de busca de usuário por id / matricula / chave
         function buscarUsuario(id) {
-            return estado.usuarios.find(u => u.id === Number(id)) || null;
+            if (id === null || id === undefined || id === '') return null;
+            const strId = String(id).trim();
+            return estado.usuarios.find(u =>
+                String(u.id).trim() === strId ||
+                String(u.matricula || '').trim() === strId ||
+                String(u.chave || '').trim() === strId
+            ) || null;
         }
 
+        // Helper de busca de coluna por id ou slug
         function buscarColuna(id) {
-            return estado.colunas.find(c => c.id === id) || null;
+            if (id === null || id === undefined || id === '') return null;
+            const strId = String(id).trim();
+            return estado.colunas.find(c =>
+                String(c.id).trim() === strId ||
+                (c.slug && String(c.slug).trim() === strId)
+            ) || null;
         }
 
         function buscarEquipe(id) {
@@ -156,26 +284,85 @@
                 .replace(/'/g, '&#039;');
         }
 
-        function exibirToast(mensagem, tipo = 'primary') {
+        // =============================================================================
+        // § 2.1 · MÓDULO GLOBAL DE NOTIFICAÇÕES (TOAST SYSTEM EM VANILLA JS)
+        // =============================================================================
+        window.showToast = function(mensagem, tipo = 'sucesso', duracao = 4000) {
             let container = document.getElementById('plannerToastContainer');
             if (!container) {
                 container = document.createElement('div');
                 container.id = 'plannerToastContainer';
-                container.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;pointer-events:none;';
+                container.className = 'planner-toast-container';
                 document.body.appendChild(container);
             }
 
+            const tipoNorm = (tipo === 'success' || tipo === 'sucesso') ? 'sucesso'
+                           : (tipo === 'danger' || tipo === 'error' || tipo === 'erro') ? 'erro'
+                           : (tipo === 'warning' || tipo === 'aviso') ? 'aviso'
+                           : 'info';
+
+            const iconMap = {
+                'sucesso': 'bi-check-circle-fill',
+                'erro': 'bi-x-circle-fill',
+                'aviso': 'bi-exclamation-triangle-fill',
+                'info': 'bi-info-circle-fill',
+            };
+
+            const titleMap = {
+                'sucesso': 'Sucesso',
+                'erro': 'Erro',
+                'aviso': 'Atenção',
+                'info': 'Informação',
+            };
+
             const toast = document.createElement('div');
-            toast.className = `alert alert-${tipo} py-2 px-3 m-0 shadow-lg`;
-            toast.style.cssText = 'pointer-events:auto;min-width:240px;border-radius:10px;font-size:.85rem;animation:plannerFadeIn 0.25s ease;';
-            toast.textContent = mensagem;
+            toast.className = `planner-toast planner-toast--${tipoNorm}`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+
+            toast.innerHTML = `
+                <div class="planner-toast__icon">
+                    <i class="bi ${iconMap[tipoNorm]}"></i>
+                </div>
+                <div class="planner-toast__content">
+                    <div class="planner-toast__title">${titleMap[tipoNorm]}</div>
+                    <div class="planner-toast__message">${escaparHtml(mensagem)}</div>
+                </div>
+                <button type="button" class="planner-toast__close" aria-label="Fechar notificação">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+
             container.appendChild(toast);
 
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transition = 'opacity .3s ease';
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
+            const dismiss = () => {
+                toast.classList.add('is-leaving');
+                setTimeout(() => {
+                    if (toast.parentNode) toast.remove();
+                }, 300);
+            };
+
+            const closeBtn = toast.querySelector('.planner-toast__close');
+            if (closeBtn) closeBtn.addEventListener('click', dismiss);
+
+            if (duracao > 0) {
+                setTimeout(dismiss, duracao);
+            }
+        };
+        window.plannerToast = window.showToast;
+
+        function exibirToast(mensagem, tipo = 'sucesso', duracao = 4000) {
+            window.showToast(mensagem, tipo, duracao);
+        }
+
+        // Helper global de renderização de foto do usuário (substitui bolinhas de iniciais)
+        function renderizarAvatar(u, tamanho = 'sm') {
+            if (!u) return '';
+            const ident = String(u.matricula || u.chave || u.id || 'default').trim();
+            const foto = u.foto || `public/img/${ident}.png`;
+            const nome = escaparHtml(u.nome || 'Usuário');
+            const classeTamanho = `avatar-${tamanho}`;
+            return `<img class="avatar ${classeTamanho} rounded-circle" src="${foto}" alt="${nome}" title="${nome}" data-user-id="${ident}" onerror="this.onerror=null;this.src='public/img/default.png';">`;
         }
 
         // 
@@ -199,12 +386,16 @@
                 viewEl.classList.toggle('is-active', isActive);
             });
 
-            // Ações específicas de cada view
+            // AÇÕES ESPECÍFICAS DE CADA VIEW
             if (viewName === 'dashboard') {
-                renderizarGraficosDashboard();
+                // BREVE TIMEOUT PARA CONCLUIR TRANSIÇÃO DE DISPLAY NO DOM
+                setTimeout(renderizarGraficosDashboard, 50);
             } else if (viewName === 'calendario') {
                 renderizarCalendario();
             }
+
+            // APLICA OS FILTROS ATIVOS NA NOVA VISÃO
+            sincronizarFiltros();
 
             if (updateUrl) {
                 const url = new URL(window.location.href);
@@ -212,6 +403,17 @@
                 window.history.pushState({ view: viewName }, '', url);
             }
         }
+
+        // REDIMENSIONAMENTO RESPONSIVO DOS GRÁFICOS QUANDO A JANELA MUDA DE TAMANHO
+        window.addEventListener('resize', () => {
+            if (estado.visaoAtual === 'dashboard') {
+                Object.values(estado.graficosAtivos).forEach(chart => {
+                    if (chart && typeof chart.resize === 'function') {
+                        chart.resize();
+                    }
+                });
+            }
+        });
 
         // Intercepta cliques nos links de view
         document.querySelectorAll('[data-view-link]').forEach(link => {
@@ -251,7 +453,7 @@
                 badgeId: 'badgeFiltroResponsaveis',
                 inputName: 'filtro_responsaveis[]',
                 key: 'responsaveis',
-                isNumber: true
+                isNumber: false
             },
             {
                 id: 'msPrioridades',
@@ -442,8 +644,10 @@
 
             // 3. Filtro de Responsáveis (múltiplos permitidos — usuário marca um ou vários)
             if (Array.isArray(f.responsaveis) && f.responsaveis.length > 0) {
-                const resps = (tarefa.responsaveis || []).map(Number);
-                const hasAssignee = f.responsaveis.some(uId => resps.includes(uId));
+                const resps = (tarefa.responsaveis || []).map(r => String(r).trim());
+                const ps = (tarefa.pessoas_soltas || []).map(p => String(p).trim());
+                const todosEnvolvidos = [...resps, ...ps];
+                const hasAssignee = f.responsaveis.some(uId => todosEnvolvidos.includes(String(uId).trim()));
                 if (!hasAssignee) return false;
             }
 
@@ -453,19 +657,19 @@
                 const matchDirect = f.equipes.some(eqId => taskEqs.includes(eqId));
                 if (!matchDirect) {
                     // Fallback: verificar se membros da equipe estão nos responsáveis da tarefa
-                    const allowedMembers = f.equipes.flatMap(eqId => buscarMembrosEquipeEFilhas(eqId));
-                    const taskResps = (tarefa.responsaveis || []).map(Number);
+                    const allowedMembers = f.equipes.flatMap(eqId => buscarMembrosEquipeEFilhas(eqId)).map(m => String(m).trim());
+                    const taskResps = (tarefa.responsaveis || []).map(r => String(r).trim());
                     const matchMember = taskResps.some(r => allowedMembers.includes(r));
                     if (!matchMember) return false;
                 }
             }
 
             // 5. Filtro de Intervalo de Data (Data Início e Data Fim)
-            if (f.dataInicio && tarefa.prazo) {
-                if (tarefa.prazo < f.dataInicio) return false;
+            if (f.dataInicio) {
+                if (!tarefa.prazo || tarefa.prazo < f.dataInicio) return false;
             }
-            if (f.dataFim && tarefa.prazo) {
-                if (tarefa.prazo > f.dataFim) return false;
+            if (f.dataFim) {
+                if (!tarefa.prazo || tarefa.prazo > f.dataFim) return false;
             }
 
             // 6. Legado: filtro de prazo único se existir
@@ -510,27 +714,60 @@
             });
             atualizarContagemColunas();
 
-            // Aplica na View Lista
+            // APLICA NA VIEW LISTA
             const rows = document.querySelectorAll('#plannerTabelaBody .planner-table__row');
             let visiveisLista = 0;
             rows.forEach(row => {
                 const id = Number(row.dataset.taskId);
                 const tarefa = estado.tarefas.find(t => t.id === id);
                 if (!tarefa) return;
-                const match = tarefaPassaNosFiltos(tarefa);
+                let match = tarefaPassaNosFiltos(tarefa);
+
+                // FILTRAGEM DINÂMICA POR ABA DA LISTA (TODAS / PENDENTES / ATRASADAS / CONCLUÍDAS)
+                if (match && estado.filtroListaTab && estado.filtroListaTab !== 'todas') {
+                    if (estado.filtroListaTab === 'pendentes') {
+                        match = (String(tarefa.coluna_id) !== 'concluido' && Number(tarefa.coluna_id) !== 4);
+                    } else if (estado.filtroListaTab === 'atrasadas') {
+                        match = (tarefa.status_prazo === 'atrasada');
+                    } else if (estado.filtroListaTab === 'concluidas') {
+                        match = (String(tarefa.coluna_id) === 'concluido' || Number(tarefa.coluna_id) === 4);
+                    }
+                }
+
                 row.style.display = match ? '' : 'none';
                 if (match) visiveisLista++;
             });
             const listaCount = document.getElementById('listaCount');
             if (listaCount) listaCount.textContent = `${visiveisLista} tarefa(s)`;
 
-            // Aplica na View Minhas Tarefas
+            // ATUALIZA AS CONTAGENS DAS ABAS DA LISTA COM BASE NOS FILTROS ATIVOS
+            const tarefasFiltradas = estado.tarefas.filter(t => tarefaPassaNosFiltos(t));
+            const cTodas = tarefasFiltradas.length;
+            const cPendentes = tarefasFiltradas.filter(t => String(t.coluna_id) !== 'concluido' && Number(t.coluna_id) !== 4).length;
+            const cAtrasadas = tarefasFiltradas.filter(t => t.status_prazo === 'atrasada').length;
+            const cConcluidas = tarefasFiltradas.filter(t => String(t.coluna_id) === 'concluido' || Number(t.coluna_id) === 4).length;
+
+            const tabTodas = document.querySelector('.planner-lista__tab[data-lista-tab="todas"]');
+            const tabPendentes = document.querySelector('.planner-lista__tab[data-lista-tab="pendentes"]');
+            const tabAtrasadas = document.querySelector('.planner-lista__tab[data-lista-tab="atrasadas"]');
+            const tabConcluidas = document.querySelector('.planner-lista__tab[data-lista-tab="concluidas"]');
+
+            if (tabTodas) tabTodas.textContent = `Todas (${cTodas})`;
+            if (tabPendentes) tabPendentes.textContent = `Pendentes (${cPendentes})`;
+            if (tabAtrasadas) tabAtrasadas.textContent = `Atrasadas (${cAtrasadas})`;
+            if (tabConcluidas) tabConcluidas.textContent = `Concluídas (${cConcluidas})`;
+
+            // CONTROLE DO ESTADO VAZIO NA TABELA DA LISTA
+            const tabelaEmptyRow = document.getElementById('plannerTabelaEmptyRow');
+            if (tabelaEmptyRow) {
+                tabelaEmptyRow.style.display = (visiveisLista === 0) ? '' : 'none';
+            }
+
+            // APLICA NA VIEW MINHAS TAREFAS
             const minhasCards = document.querySelectorAll('#minhasGrid .planner-minhas__card');
             let visiveisMinhas = 0;
             minhasCards.forEach(card => {
                 const id = Number(card.dataset.taskId);
-                // Em Minhas Tarefas, o usuário atual já é responsável;
-                // filtramos pelos outros critérios (prioridade, datas, texto)
                 const tarefa = estado.tarefas.find(t => t.id === id);
                 if (!tarefa) return;
                 const match = tarefaPassaNosFiltos(tarefa);
@@ -540,11 +777,11 @@
             const subtituloMinhas = document.getElementById('minhasSubtitle');
             if (subtituloMinhas) subtituloMinhas.textContent = `${visiveisMinhas} tarefa(s) atribuída(s) a você`;
 
-            // Vazio de Minhas Tarefas
-            const minhasEmpty = document.getElementById('minhasEmpty');
-            if (minhasEmpty) minhasEmpty.style.display = visiveisMinhas === 0 && minhasCards.length > 0 ? '' : 'none';
+            // CONTROLE DO ESTADO VAZIO DE MINHAS TAREFAS
+            const minhasEmpty = document.getElementById('minhasEmpty') || document.getElementById('minhasEmptyState');
+            if (minhasEmpty) minhasEmpty.style.display = (visiveisMinhas === 0) ? 'flex' : 'none';
 
-            // Re-renderiza dashboard ou calendário se estiver ativo
+            // RE-RENDERIZA DASHBOARD OU CALENDÁRIO SE ESTIVER ATIVO
             if (estado.visaoAtual === 'dashboard') {
                 renderizarGraficosDashboard();
             } else if (estado.visaoAtual === 'calendario') {
@@ -558,6 +795,12 @@
                 const visibleCount = col.querySelectorAll(`.task-card:not([style*="display: none"])`).length;
                 const countBadge = col.querySelector(`[data-count-for="${colId}"]`);
                 if (countBadge) countBadge.textContent = String(visibleCount);
+
+                // CONTROLE DO ESTADO VAZIO NA COLUNA DO KANBAN
+                const emptyCol = col.querySelector('.planner-empty-column');
+                if (emptyCol) {
+                    emptyCol.style.display = (visibleCount === 0) ? 'flex' : 'none';
+                }
             });
         }
 
@@ -807,10 +1050,30 @@
                 }
             }
 
+            // Atualiza contadores dos acordeons no modal de detalhes
+            const bEq = document.getElementById('badgeModalEquipes');
+            if (bEq) {
+                const tot = (tarefa.equipes || []).length;
+                bEq.textContent = String(tot);
+                bEq.classList.toggle('d-none', tot === 0);
+            }
+            const bResp = document.getElementById('badgeModalResponsaveis');
+            if (bResp) {
+                const tot = (tarefa.responsaveis || []).length;
+                bResp.textContent = String(tot);
+                bResp.classList.toggle('d-none', tot === 0);
+            }
+            const bPs = document.getElementById('badgeModalPessoasSoltas');
+            if (bPs) {
+                const tot = (tarefa.pessoas_soltas || []).length;
+                bPs.textContent = String(tot);
+                bPs.classList.toggle('d-none', tot === 0);
+            }
+
             // 2. Renderiza avatares dos responsáveis atuais
             if (assigneesDiv) {
                 assigneesDiv.innerHTML = '';
-                const resps = (tarefa.responsaveis || []).map(Number);
+                const resps = (tarefa.responsaveis || []).map(r => String(r).trim());
                 if (resps.length === 0) {
                     assigneesDiv.innerHTML = '<span class="text-muted small">Nenhum responsável atribuído.</span>';
                 } else {
@@ -820,7 +1083,7 @@
                         const badge = document.createElement('span');
                         badge.className = 'planner-removable-badge planner-removable-badge--resp';
                         badge.innerHTML = `
-                            <span class="avatar avatar-xs rounded-circle" style="background:${u.cor}">${escaparHtml(u.iniciais)}</span>
+                            ${renderizarAvatar(u, 'xs')}
                             <span>${escaparHtml(u.nome)}</span>
                             <button type="button" class="planner-removable-badge__del" data-remove-resp="${u.id}" title="Remover responsável ${escaparHtml(u.nome)}" aria-label="Remover">
                                 <i class="bi bi-x"></i>
@@ -835,7 +1098,7 @@
             const pessoasSoltasDiv = document.getElementById('plannerModalPessoasSoltas');
             if (pessoasSoltasDiv) {
                 pessoasSoltasDiv.innerHTML = '';
-                const psList = (tarefa.pessoas_soltas || []).map(Number);
+                const psList = (tarefa.pessoas_soltas || []).map(p => String(p).trim());
                 if (psList.length === 0) {
                     pessoasSoltasDiv.innerHTML = '<span class="text-muted small">Nenhuma pessoa avulsa associada.</span>';
                 } else {
@@ -845,7 +1108,7 @@
                         const badge = document.createElement('span');
                         badge.className = 'planner-removable-badge planner-removable-badge--ps';
                         badge.innerHTML = `
-                            <span class="avatar avatar-xs rounded-circle" style="background:${u.cor}">${escaparHtml(u.iniciais)}</span>
+                            ${renderizarAvatar(u, 'xs')}
                             <span>${escaparHtml(u.nome)}</span>
                             <button type="button" class="planner-removable-badge__del" data-remove-ps="${u.id}" title="Remover pessoa avulsa ${escaparHtml(u.nome)}" aria-label="Remover">
                                 <i class="bi bi-x"></i>
@@ -873,9 +1136,9 @@
             if (picker) {
                 picker.setAttribute('hidden', '');
                 const checkboxes = picker.querySelectorAll('input[name="resp_picker[]"]');
-                const resps = (tarefa.responsaveis || []).map(Number);
+                const resps = (tarefa.responsaveis || []).map(r => String(r).trim());
                 checkboxes.forEach(cb => {
-                    cb.checked = resps.includes(Number(cb.value));
+                    cb.checked = resps.includes(String(cb.value).trim());
                     cb.closest('.planner-assignee-option')?.classList.toggle('is-selected', cb.checked);
                 });
             }
@@ -885,15 +1148,27 @@
             if (psPicker) {
                 psPicker.setAttribute('hidden', '');
                 const checkboxes = psPicker.querySelectorAll('input[name="ps_picker[]"]');
-                const psList = (tarefa.pessoas_soltas || []).map(Number);
+                const psList = (tarefa.pessoas_soltas || []).map(p => String(p).trim());
                 checkboxes.forEach(cb => {
-                    cb.checked = psList.includes(Number(cb.value));
+                    cb.checked = psList.includes(String(cb.value).trim());
                     cb.closest('.planner-assignee-option')?.classList.toggle('is-selected', cb.checked);
                 });
             }
 
             carregarComentariosTarefa(tarefa.id);
-            renderizarAtividadesTarefa(tarefa.id);
+            carregarAtividadesTarefa(tarefa.id);
+
+            // MANTER ACORDEONS FECHADOS POR PADRÃO NO MODAL DE DETALHES
+            const modalTarefaEl = document.getElementById('planner-modal-tarefa');
+            if (modalTarefaEl) {
+                modalTarefaEl.querySelectorAll('.planner-accordion').forEach(acc => {
+                    acc.classList.remove('is-open');
+                    const btn = acc.querySelector('.planner-accordion__header');
+                    if (btn) btn.setAttribute('aria-expanded', 'false');
+                    const body = acc.querySelector('.planner-accordion__body');
+                    if (body) body.setAttribute('hidden', '');
+                });
+            }
 
             if (modalTarefaInstance) modalTarefaInstance.show();
         }
@@ -991,7 +1266,7 @@
                 if (!taskId) return;
 
                 const selecionados = Array.from(picker.querySelectorAll('input[name="resp_picker[]"]:checked'))
-                    .map(cb => Number(cb.value));
+                    .map(cb => String(cb.value).trim());
 
                 try {
                     await chamarApi('atualizar_responsaveis', { task_id: taskId, responsaveis: selecionados });
@@ -1008,7 +1283,7 @@
                         if (avatarStack) {
                             avatarStack.innerHTML = selecionados.map(uid => {
                                 const u = buscarUsuario(uid);
-                                return u ? `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>` : '';
+                                return u ? renderizarAvatar(u, 'xs') : '';
                             }).join('');
                         }
                     }
@@ -1049,7 +1324,7 @@
                 if (!taskId) return;
 
                 const selecionados = Array.from(psPicker.querySelectorAll('input[name="ps_picker[]"]:checked'))
-                    .map(cb => Number(cb.value));
+                    .map(cb => String(cb.value).trim());
 
                 try {
                     await chamarApi('atualizar_pessoas_soltas', { task_id: taskId, pessoas_soltas: selecionados });
@@ -1120,12 +1395,12 @@
         document.getElementById('plannerModalAssignees')?.addEventListener('click', async e => {
             const delBtn = e.target.closest('[data-remove-resp]');
             if (!delBtn) return;
-            const respId = Number(delBtn.dataset.removeResp);
+            const respId = String(delBtn.dataset.removeResp).trim();
             const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
             const tarefa = estado.tarefas.find(t => t.id === taskId);
             if (!tarefa || !respId) return;
 
-            const novos = (tarefa.responsaveis || []).filter(id => id !== respId);
+            const novos = (tarefa.responsaveis || []).filter(id => String(id).trim() !== respId);
             try {
                 await chamarApi('atualizar_responsaveis', { task_id: taskId, responsaveis: novos });
                 tarefa.responsaveis = novos;
@@ -1136,7 +1411,7 @@
                     if (avatarStack) {
                         avatarStack.innerHTML = novos.map(uid => {
                             const u = buscarUsuario(uid);
-                            return u ? `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>` : '';
+                            return u ? renderizarAvatar(u, 'xs') : '';
                         }).join('');
                     }
                 }
@@ -1148,12 +1423,12 @@
         document.getElementById('plannerModalPessoasSoltas')?.addEventListener('click', async e => {
             const delBtn = e.target.closest('[data-remove-ps]');
             if (!delBtn) return;
-            const psId = Number(delBtn.dataset.removePs);
+            const psId = String(delBtn.dataset.removePs).trim();
             const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
             const tarefa = estado.tarefas.find(t => t.id === taskId);
             if (!tarefa || !psId) return;
 
-            const novos = (tarefa.pessoas_soltas || []).filter(id => id !== psId);
+            const novos = (tarefa.pessoas_soltas || []).filter(id => String(id).trim() !== psId);
             try {
                 await chamarApi('atualizar_pessoas_soltas', { task_id: taskId, pessoas_soltas: novos });
                 tarefa.pessoas_soltas = novos;
@@ -1169,6 +1444,71 @@
                 exibirToast('Pessoa avulsa removida!', 'info');
                 abrirDetalhesTarefa(taskId);
             } catch (err) {}
+        });
+
+        // =============================================================================
+        // § 7.1 · EXCLUSÃO DE TAREFA COM MODAL DE CONFIRMAÇÃO ESTILIZADO
+        // =============================================================================
+        async function executarExclusaoTarefa(taskId) {
+            const id = Number(taskId);
+            if (!id) return;
+            const tarefa = estado.tarefas.find(t => t.id === id);
+            const titulo = tarefa ? tarefa.titulo : 'esta tarefa';
+
+            const confirmado = await confirmarAcao({
+                titulo: 'Excluir Tarefa',
+                mensagem: `Tem certeza que deseja excluir a tarefa «${titulo}» permanentemente? Todas as atividades e comentários serão removidos.`,
+                textoBotao: 'Excluir Tarefa',
+                variante: 'danger'
+            });
+
+            if (!confirmado) return;
+
+            try {
+                await chamarApi('excluir_tarefa', { task_id: id });
+                // Remove do estado local
+                estado.tarefas = estado.tarefas.filter(t => t.id !== id);
+                estado.comentarios = estado.comentarios.filter(c => Number(c.tarefa_id) !== id);
+                estado.atividades = estado.atividades.filter(a => Number(a.tarefa_id) !== id);
+
+                // Remove cards do DOM (Kanban, Minhas Tarefas e Lista)
+                document.querySelectorAll(`.task-card[data-task-id="${id}"]`).forEach(el => el.remove());
+                document.querySelectorAll(`.planner-table__row[data-task-id="${id}"]`).forEach(el => el.remove());
+                document.querySelectorAll(`.planner-minhas__card[data-task-id="${id}"]`).forEach(el => el.remove());
+
+                atualizarContagemColunas();
+                sincronizarFiltros();
+
+                // Fecha o modal de detalhes se estiver aberto
+                if (modalTarefaEl && window.bootstrap?.Modal) {
+                    window.bootstrap.Modal.getInstance(modalTarefaEl)?.hide();
+                }
+
+                exibirToast(`Tarefa «${titulo}» excluída com sucesso!`, 'success');
+            } catch (err) {
+                // Erro tratado por chamarApi
+            }
+        }
+
+        // Botão de excluir dentro do modal de detalhes da tarefa
+        document.getElementById('plannerModalBtnExcluir')?.addEventListener('click', () => {
+            const taskId = Number(document.getElementById('plannerCommentTarefaId')?.value);
+            if (taskId) {
+                executarExclusaoTarefa(taskId);
+            }
+        });
+
+        // Delegação global para botões data-action="excluir-tarefa" (Kanban e Lista)
+        document.addEventListener('click', e => {
+            const btnExcluir = e.target.closest('[data-action="excluir-tarefa"]');
+            if (btnExcluir) {
+                e.preventDefault();
+                e.stopPropagation();
+                const taskId = Number(btnExcluir.dataset.taskId || btnExcluir.closest('[data-task-id]')?.dataset.taskId);
+                if (taskId) {
+                    executarExclusaoTarefa(taskId);
+                }
+            }
         });
 
         // Renderização e sincronização de comentários
@@ -1197,7 +1537,7 @@
             const container = document.getElementById('plannerCommentThread');
             if (!container) return;
 
-            const coms = estado.comentarios.filter(c => c.tarefa_id === taskId);
+            const coms = estado.comentarios.filter(c => Number(c.tarefa_id) === Number(taskId));
             container.innerHTML = '';
 
             if (coms.length === 0) {
@@ -1207,7 +1547,7 @@
 
             coms.forEach(c => {
                 const autor = buscarUsuario(c.usuario_id);
-                const isAuthor = Number(c.usuario_id) === Number(estado.usuarioAtual.id);
+                const isAuthor = String(c.usuario_id).trim() === String(estado.usuarioAtual.id || estado.usuarioAtual.matricula || '').trim();
 
                 const item = document.createElement('div');
                 item.className = 'planner-comment';
@@ -1215,18 +1555,20 @@
 
                 item.innerHTML = `
                     <div class="planner-comment__avatar">
-                        <span class="avatar avatar-sm rounded-circle" style="background:${autor?.cor || '#6366f1'}">
-                            ${escaparHtml(autor?.iniciais || '?')}
-                        </span>
+                        ${renderizarAvatar(autor, 'sm')}
                     </div>
                     <div class="planner-comment__content">
                         <div class="planner-comment__header">
                             <span class="planner-comment__author">${escaparHtml(autor?.nome || 'Usuário')}</span>
                             <span class="planner-comment__time">${formatarTempoRelativo(c.criado_em)}${c.editado_em ? ' <em class="text-muted">(editado)</em>' : ''}</span>
                             ${isAuthor ? `
-                            <div class="planner-comment__actions ms-auto">
-                                <button type="button" class="btn btn-link btn-sm p-0 text-muted me-2" data-comment-action="edit">Editar</button>
-                                <button type="button" class="btn btn-link btn-sm p-0 text-danger" data-comment-action="delete">Excluir</button>
+                            <div class="planner-comment__actions ms-auto d-flex align-items-center gap-1">
+                                <button type="button" class="planner-btn-icon-sm" data-comment-action="edit" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar comentário" aria-label="Editar comentário">
+                                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="planner-btn-icon-sm text-danger" data-comment-action="delete" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir comentário" aria-label="Excluir comentário">
+                                    <i class="bi bi-trash" aria-hidden="true"></i>
+                                </button>
                             </div>` : ''}
                         </div>
                         <div class="planner-comment__body">${escaparHtml(c.texto)}</div>
@@ -1258,6 +1600,8 @@
                         renderizarComentariosTarefa(taskId);
                         if (textInput) textInput.value = '';
                         exibirToast('Comentário enviado!', 'success');
+                        // ATUALIZA O LOG DE ATIVIDADES EM TEMPO REAL
+                        carregarAtividadesTarefa(taskId);
                     }
                 } finally {
                     if (submitBtn) submitBtn.disabled = false;
@@ -1277,12 +1621,19 @@
             if (!comentario) return;
 
             if (delBtn) {
-                if (!confirm('Deseja realmente excluir este comentário?')) return;
+                const confirmado = await confirmarAcao({
+                    titulo: 'Excluir comentário',
+                    mensagem: 'Deseja realmente remover este comentário permanentemente?',
+                    textoBotao: 'Excluir',
+                    variante: 'danger'
+                });
+                if (!confirmado) return;
+
                 try {
                     await chamarApi('excluir_comentario', { comentario_id: comId });
                     estado.comentarios = estado.comentarios.filter(c => c.id !== comId);
                     renderizarComentariosTarefa(comentario.tarefa_id);
-                    exibirToast('Comentário excluído!', 'info');
+                    exibirToast('Comentário excluído com sucesso!', 'info');
                 } catch (err) {}
             } else if (editBtn) {
                 const bodyEl = commentEl.querySelector('.planner-comment__body');
@@ -1317,11 +1668,29 @@
             }
         });
 
+        // SINCRONIZAÇÃO E CARREGAMENTO DE ATIVIDADES / AUDITORIA DA TAREFA
+        async function carregarAtividadesTarefa(taskId) {
+            renderizarAtividadesTarefa(taskId); // RENDERIZAÇÃO IMEDIATA COM DADOS EM CACHE
+
+            try {
+                const res = await chamarApi('obter_atividades', { tarefa_id: taskId });
+                if (res?.atividades && Array.isArray(res.atividades)) {
+                    // ATUALIZA O ESTADO GLOBAL DE ATIVIDADES PARA ESTA TAREFA
+                    estado.atividades = estado.atividades
+                        .filter(a => Number(a.tarefa_id) !== Number(taskId))
+                        .concat(res.atividades);
+                    renderizarAtividadesTarefa(taskId);
+                }
+            } catch (err) {
+                console.error('Erro ao sincronizar atividades da tarefa:', err);
+            }
+        }
+
         function renderizarAtividadesTarefa(taskId) {
             const container = document.getElementById('plannerActivityLog');
             if (!container) return;
 
-            const acts = estado.atividades.filter(a => a.tarefa_id === taskId);
+            const acts = estado.atividades.filter(a => Number(a.tarefa_id) === Number(taskId));
             container.innerHTML = '';
 
             if (acts.length === 0) {
@@ -1334,14 +1703,30 @@
                 const li = document.createElement('li');
                 li.className = 'planner-activity-log__item';
 
+                let meta = a.meta;
+                if (typeof meta === 'string') {
+                    try {
+                        meta = JSON.parse(meta);
+                    } catch (e) {
+                        meta = null;
+                    }
+                }
+
                 let desc = 'realizou uma alteração';
-                if (a.tipo === 'criacao') desc = 'criou a tarefa';
-                else if (a.tipo === 'movimentacao') {
-                    const de = a.meta?.de ? (buscarColuna(a.meta.de)?.titulo || a.meta.de) : '';
-                    const para = a.meta?.para ? (buscarColuna(a.meta.para)?.titulo || a.meta.para) : '';
+                if (a.tipo === 'criacao') {
+                    desc = 'criou a tarefa';
+                } else if (a.tipo === 'movimentacao') {
+                    const de = meta?.de ? (buscarColuna(meta.de)?.titulo || `Coluna ${meta.de}`) : 'Coluna inicial';
+                    const para = meta?.para ? (buscarColuna(meta.para)?.titulo || `Coluna ${meta.para}`) : 'Nova coluna';
                     desc = `moveu de «${de}» para «${para}»`;
                 } else if (a.tipo === 'atribuicao') {
                     desc = 'atualizou os responsáveis';
+                } else if (a.tipo === 'equipes') {
+                    const qtd = meta?.total !== undefined ? ` (${meta.total})` : '';
+                    desc = `atualizou as equipes vinculadas${qtd}`;
+                } else if (a.tipo === 'pessoas_soltas') {
+                    const qtd = meta?.total !== undefined ? ` (${meta.total})` : '';
+                    desc = `atualizou o grupo avulso${qtd}`;
                 } else if (a.tipo === 'comentario') {
                     desc = 'adicionou um comentário';
                 }
@@ -1382,12 +1767,12 @@
                 const payload = {
                     titulo,
                     descricao: descInput?.value.trim() || null,
-                    coluna_id: colInput?.value || 'backlog',
+                    coluna_id: colInput?.value ? (Number(colInput.value) || colInput.value) : 1,
                     prioridade: prioInput?.value || 'media',
                     prazo: prazoInput?.value || null,
-                    responsaveis: Array.from(respCheckboxes).map(cb => Number(cb.value)),
+                    responsaveis: Array.from(respCheckboxes).map(cb => String(cb.value).trim()),
                     equipes: Array.from(teamCheckboxes).map(cb => Number(cb.value)),
-                    pessoas_soltas: Array.from(psCheckboxes).map(cb => Number(cb.value))
+                    pessoas_soltas: Array.from(psCheckboxes).map(cb => String(cb.value).trim())
                 };
 
                 const submitBtn = document.getElementById('plannerBtnCriarTarefa');
@@ -1452,6 +1837,7 @@
                 const nomeInput = document.getElementById('novaEquipeNome');
                 const paiSelect = document.getElementById('novaEquipePai');
                 const corInput = document.getElementById('novaEquipeCor');
+                const liderSelect = document.getElementById('novaEquipeLider');
                 const membrosCheckboxes = formNovaEquipe.querySelectorAll('input[name="membros[]"]:checked');
 
                 const nome = nomeInput?.value.trim();
@@ -1463,13 +1849,15 @@
 
                 const paiId = paiSelect?.value ? Number(paiSelect.value) : null;
                 const cor = corInput?.value || '#10B981';
-                const membros = Array.from(membrosCheckboxes).map(cb => Number(cb.value));
+                // CAPTURA DO LÍDER SELECIONADO NA CRIAÇÃO DA EQUIPE
+                const liderId = liderSelect?.value ? String(liderSelect.value).trim() : null;
+                const membros = Array.from(membrosCheckboxes).map(cb => String(cb.value).trim());
 
                 const submitBtn = document.getElementById('plannerBtnCriarEquipe');
                 if (submitBtn) submitBtn.disabled = true;
 
                 try {
-                    const res = await chamarApi('criar_equipe', { nome, cor, pai_id: paiId, membros });
+                    const res = await chamarApi('criar_equipe', { nome, cor, pai_id: paiId, lider_id: liderId, membros });
                     if (res?.equipe) {
                         const novaEquipe = res.equipe;
                         estado.equipes.push(novaEquipe);
@@ -1571,7 +1959,7 @@
                         <span class="avatar-stack">
                             ${(t.responsaveis || []).map(uid => {
                                 const u = buscarUsuario(uid);
-                                return u ? `<span class="avatar avatar-xs rounded-circle" style="background:${u.cor}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>` : '';
+                                return u ? renderizarAvatar(u, 'xs') : '';
                             }).join('')}
                         </span>
                     </span>
@@ -1586,117 +1974,238 @@
         function fecharSpotlight() { /* desativado */ }
         function renderizarResultadosSpotlight() { /* desativado */ }
 
-        // 
+        // =============================================================================
+        // § 12 · DASHBOARD ANALÍTICO: GRÁFICOS INTERATIVOS (CHART.JS)
+        // =============================================================================
+        // =============================================================================
+        // § 12 · DASHBOARD ANALÍTICO: GRÁFICOS INTERATIVOS E KPIS DINÂMICOS (CHART.JS)
+        // =============================================================================
         function renderizarGraficosDashboard() {
-            if (typeof Chart === 'undefined') return;
+            // VERIFICA SE A CLASSE CHART ESTÁ CARREGADA NO ESCOPO GLOBAL
+            const ChartConstructor = window.Chart || (typeof Chart !== 'undefined' ? Chart : null);
+            if (!ChartConstructor) {
+                setTimeout(renderizarGraficosDashboard, 100);
+                return;
+            }
+
+            const containerDashboard = document.querySelector('.planner-view[data-view="dashboard"]');
+            if (containerDashboard && !containerDashboard.classList.contains('is-active')) {
+                // SE O DASHBOARD NÃO ESTIVER VISÍVEL NO MOMENTO, NÃO TENTA CALCULAR DIMENSÕES DE CANVAS
+                return;
+            }
 
             const canvasColuna = document.getElementById('chartPorColuna');
             const canvasPrio = document.getElementById('chartPorPrioridade');
-            const canvasAtiv = document.getElementById('chartAtividade7dias');
+            const canvasSaude = document.getElementById('chartSaudePrazos');
+            const canvasCarga = document.getElementById('chartCargaEquipes');
 
-        const tarefasFiltradas = estado.tarefas.filter(tarefaPassaNosFiltos);
+            const tarefasFiltradas = estado.tarefas.filter(tarefaPassaNosFiltos);
 
-            // Gráfico 1: Tarefas por Coluna
-            if (canvasColuna) {
-                if (estado.graficosAtivos.coluna) estado.graficosAtivos.coluna.destroy();
+            // ATUALIZA KPIS DO TOPO DO DASHBOARD DINAMICAMENTE COM BASE NOS FILTROS ATIVOS
+            const kpiTotalEl = document.getElementById('kpiTotalVal');
+            const kpiAtrasadasEl = document.getElementById('kpiAtrasadasVal');
+            const kpiFechadasEl = document.getElementById('kpiFechadasVal');
+            const kpiUrgentesEl = document.getElementById('kpiUrgentesVal');
 
-                const labels = estado.colunas.map(c => c.titulo);
-                const data = estado.colunas.map(c => tarefasFiltradas.filter(t => t.coluna_id === c.id).length);
-                const colors = estado.colunas.map(c => c.cor);
+            const totalTarefas = tarefasFiltradas.length;
+            const concluidasTarefas = tarefasFiltradas.filter(t => String(t.coluna_id) === 'concluido' || Number(t.coluna_id) === 4).length;
+            const atrasadasTarefas = tarefasFiltradas.filter(t => t.status_prazo === 'atrasada' && String(t.coluna_id) !== 'concluido' && Number(t.coluna_id) !== 4).length;
+            const urgentesTarefas = tarefasFiltradas.filter(t => t.prioridade === 'urgente' && String(t.coluna_id) !== 'concluido' && Number(t.coluna_id) !== 4).length;
 
-                estado.graficosAtivos.coluna = new Chart(canvasColuna, {
-                    type: 'bar',
-                    data: {
-                        labels,
-                        datasets: [{
-                            data,
-                            backgroundColor: colors,
-                            borderRadius: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94A3B8' }, grid: { color: 'rgba(255,255,255,0.06)' } },
-                            x: { ticks: { color: '#94A3B8' }, grid: { display: false } }
-                        }
-                    }
-                });
-            }
+            if (kpiTotalEl) kpiTotalEl.textContent = String(totalTarefas);
+            if (kpiAtrasadasEl) kpiAtrasadasEl.textContent = String(atrasadasTarefas);
+            if (kpiFechadasEl) kpiFechadasEl.textContent = String(concluidasTarefas);
+            if (kpiUrgentesEl) kpiUrgentesEl.textContent = String(urgentesTarefas);
 
-            // Gráfico 2: Tarefas por Prioridade
-            if (canvasPrio) {
-                if (estado.graficosAtivos.prio) estado.graficosAtivos.prio.destroy();
+            // AGUARDA O PRÓXIMO FRAME DE PINTURA PARA GARANTIR QUE OS CONTAINERS JÁ POSSUEM LARGURA CALCULADA
+            requestAnimationFrame(() => {
+                // 1. GRÁFICO DE DISTRIBUIÇÃO POR COLUNA (FUNIL KANBAN)
+                if (canvasColuna) {
+                    if (estado.graficosAtivos.coluna) estado.graficosAtivos.coluna.destroy();
 
-                const prios = ['urgente', 'alta', 'media', 'baixa'];
-                const labelsPrio = ['Urgente', 'Alta', 'Média', 'Baixa'];
-                const dataPrio = prios.map(p => tarefasFiltradas.filter(t => t.prioridade === p).length);
-                const colorsPrio = ['#EF4444', '#F97316', '#FACC15', '#10B981'];
+                    const labels = estado.colunas.map(c => c.titulo);
+                    const data = estado.colunas.map(c => tarefasFiltradas.filter(t => String(t.coluna_id) === String(c.id)).length);
+                    const colors = estado.colunas.map(c => c.cor || '#6366F1');
 
-                estado.graficosAtivos.prio = new Chart(canvasPrio, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labelsPrio,
-                        datasets: [{
-                            data: dataPrio,
-                            backgroundColor: colorsPrio,
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { position: 'bottom', labels: { color: '#94A3B8', boxWidth: 12 } }
+                    estado.graficosAtivos.coluna = new ChartConstructor(canvasColuna, {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: 'Tarefas',
+                                data,
+                                backgroundColor: colors,
+                                borderRadius: 6
+                            }]
                         },
-                        cutout: '70%'
-                    }
-                });
-            }
-
-            // Gráfico 3: Atividades últimos 7 dias
-            if (canvasAtiv) {
-                if (estado.graficosAtivos.ativ) estado.graficosAtivos.ativ.destroy();
-
-                const diasLabels = [];
-                const diasContagem = [];
-                for (let i = 6; i >= 0; i--) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - i);
-                    const iso = d.toISOString().split('T')[0];
-                    const label = `${d.getDate()}/${d.getMonth() + 1}`;
-                    diasLabels.push(label);
-
-                    const count = estado.atividades.filter(a => a.criado_em && a.criado_em.startsWith(iso)).length;
-                    diasContagem.push(count);
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (ctx) => ` ${ctx.parsed.y} tarefa(s)`
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { stepSize: 1, precision: 0, color: '#94A3B8' },
+                                    grid: { color: 'rgba(255,255,255,0.06)' }
+                                },
+                                x: {
+                                    ticks: { color: '#94A3B8' },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
                 }
 
-                estado.graficosAtivos.ativ = new Chart(canvasAtiv, {
-                    type: 'line',
-                    data: {
-                        labels: diasLabels,
-                        datasets: [{
-                            label: 'Atividades',
-                            data: diasContagem,
-                            borderColor: '#FACC15',
-                            backgroundColor: 'rgba(250, 204, 21, 0.12)',
-                            pointBackgroundColor: '#FACC15',
-                            pointBorderColor: '#10B981',
-                            fill: true,
-                            tension: 0.35,
-                            pointRadius: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94A3B8' }, grid: { color: 'rgba(255,255,255,0.06)' } },
-                            x: { ticks: { color: '#94A3B8' }, grid: { display: false } }
+                // 2. GRÁFICO DE DISTRIBUIÇÃO POR PRIORIDADE
+                if (canvasPrio) {
+                    if (estado.graficosAtivos.prio) estado.graficosAtivos.prio.destroy();
+
+                    const prios = ['urgente', 'alta', 'media', 'baixa'];
+                    const labelsPrio = ['Urgente', 'Alta', 'Média', 'Baixa'];
+                    const dataPrio = prios.map(p => tarefasFiltradas.filter(t => t.prioridade === p).length);
+                    const colorsPrio = ['#EF4444', '#F97316', '#FACC15', '#10B981'];
+
+                    estado.graficosAtivos.prio = new ChartConstructor(canvasPrio, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labelsPrio,
+                            datasets: [{
+                                data: dataPrio,
+                                backgroundColor: colorsPrio,
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { color: '#94A3B8', boxWidth: 12, padding: 16 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (ctx) => ` ${ctx.label}: ${ctx.parsed} tarefa(s)`
+                                    }
+                                }
+                            },
+                            cutout: '65%'
                         }
-                    }
-                });
-            }
+                    });
+                }
+
+                // 3. GRÁFICO DE SAÚDE DOS PRAZOS OPERACIONAIS
+                if (canvasSaude) {
+                    if (estado.graficosAtivos.saude) estado.graficosAtivos.saude.destroy();
+
+                    let concluidas = 0;
+                    let noPrazo = 0;
+                    let hoje = 0;
+                    let atrasada = 0;
+                    let semPrazo = 0;
+
+                    tarefasFiltradas.forEach(t => {
+                        const isConcluida = String(t.coluna_id) === 'concluido' || Number(t.coluna_id) === 4;
+                        if (isConcluida) {
+                            concluidas++;
+                        } else if (!t.prazo) {
+                            semPrazo++;
+                        } else {
+                            const status = t.status_prazo || calcularStatusPrazo(t.prazo);
+                            if (status === 'atrasada') atrasada++;
+                            else if (status === 'hoje') hoje++;
+                            else noPrazo++;
+                        }
+                    });
+
+                    estado.graficosAtivos.saude = new ChartConstructor(canvasSaude, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Concluídas', 'No Prazo', 'Vence Hoje', 'Atrasadas', 'Sem Prazo'],
+                            datasets: [{
+                                data: [concluidas, noPrazo, hoje, atrasada, semPrazo],
+                                backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#64748B'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { color: '#94A3B8', boxWidth: 12, padding: 14 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (ctx) => ` ${ctx.label}: ${ctx.parsed} tarefa(s)`
+                                    }
+                                }
+                            },
+                            cutout: '65%'
+                        }
+                    });
+                }
+
+                // 4. GRÁFICO DE CARGA DE TRABALHO POR EQUIPE
+                if (canvasCarga) {
+                    if (estado.graficosAtivos.carga) estado.graficosAtivos.carga.destroy();
+
+                    const labelsEquipes = estado.equipes.map(e => e.nome);
+                    const dataCarga = estado.equipes.map(e => {
+                        return tarefasFiltradas.filter(t => (t.equipes || []).map(Number).includes(Number(e.id))).length;
+                    });
+                    const colorsEquipes = estado.equipes.map(e => e.cor || '#3B82F6');
+
+                    estado.graficosAtivos.carga = new ChartConstructor(canvasCarga, {
+                        type: 'bar',
+                        data: {
+                            labels: labelsEquipes,
+                            datasets: [{
+                                label: 'Tarefas Vinculadas',
+                                data: dataCarga,
+                                backgroundColor: colorsEquipes,
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (ctx) => ` ${ctx.parsed.y} tarefa(s)`
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { stepSize: 1, precision: 0, color: '#94A3B8' },
+                                    grid: { color: 'rgba(255,255,255,0.06)' }
+                                },
+                                x: {
+                                    ticks: { color: '#94A3B8' },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
         }
 
         // 
@@ -1749,9 +2258,10 @@
         const btnCalAnterior = document.getElementById('calBtnAnterior');
         const btnCalProximo = document.getElementById('calBtnProximo');
         const btnCalHoje = document.getElementById('calBtnHoje');
-        const offcanvasDiaEl = document.getElementById('plannerOffcanvasDia');
-        const offcanvasDiaTitle = document.getElementById('offcanvasDiaLabel');
-        const offcanvasDiaBody = document.getElementById('plannerOffcanvasDiaBody');
+        // MODAL CENTRALIZADO DE DETALHES DO DIA NO CALENDÁRIO
+        const modalDiaEl = document.getElementById('plannerModalDia') || document.getElementById('plannerOffcanvasDia');
+        const modalDiaTitle = document.getElementById('plannerModalDiaLabel') || document.getElementById('offcanvasDiaLabel');
+        const modalDiaBody = document.getElementById('plannerModalDiaBody') || document.getElementById('plannerOffcanvasDiaBody');
 
         if (btnCalAnterior) {
             btnCalAnterior.addEventListener('click', () => {
@@ -1879,15 +2389,15 @@
         }
 
         function abrirDetalhesDia(iso) {
-            if (!offcanvasDiaEl || !offcanvasDiaBody) return;
+            if (!modalDiaEl || !modalDiaBody) return;
 
-            if (offcanvasDiaTitle) {
-                offcanvasDiaTitle.textContent = `Tarefas de ${formatarDataLonga(iso)}`;
+            if (modalDiaTitle) {
+                modalDiaTitle.textContent = `Tarefas de ${formatarDataLonga(iso)}`;
             }
 
-            // Tarefas deste dia (aplicando filtros atuais)
+            // TAREFAS DESTE DIA (APLICANDO FILTROS ATUAIS)
             const tarefasDoDia = estado.tarefas.filter(t => t.prazo === iso && tarefaPassaNosFiltos(t));
-            offcanvasDiaBody.innerHTML = '';
+            modalDiaBody.innerHTML = '';
 
             if (tarefasDoDia.length === 0) {
                 const empty = document.createElement('div');
@@ -1896,7 +2406,7 @@
                     <i class="bi bi-calendar-check fs-1 text-muted d-block mb-3" style="opacity: 0.5;"></i>
                     <p class="text-muted small mb-0">Nenhuma tarefa com prazo para esta data.</p>
                 `;
-                offcanvasDiaBody.appendChild(empty);
+                modalDiaBody.appendChild(empty);
             } else {
                 const list = document.createElement('div');
                 list.className = 'planner-cal-task-list d-flex flex-column gap-2';
@@ -1911,33 +2421,40 @@
                     }[t.prioridade] || { rotulo: t.prioridade, classe: 'prio-media' };
 
                     const card = document.createElement('div');
-                    card.className = 'planner-cal-task-card p-3 rounded-3';
-                    card.style.cssText = 'background: var(--planner-surface-2); border: 1px solid var(--planner-border); cursor: pointer; transition: all 0.2s;';
+                    card.className = 'planner-cal-task-card p-3 rounded-3 mb-2';
+                    card.style.cssText = 'background: #FFFFFF; border: 1px solid #E2E8F0; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
                     
                     card.addEventListener('mouseenter', () => {
-                        card.style.borderColor = 'var(--planner-gold)';
+                        card.style.borderColor = '#10B981';
                         card.style.transform = 'translateY(-2px)';
+                        card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
                     });
                     card.addEventListener('mouseleave', () => {
-                        card.style.borderColor = 'var(--planner-border)';
+                        card.style.borderColor = '#E2E8F0';
                         card.style.transform = 'none';
+                        card.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
                     });
 
-                    // Clicar na tarefa do dia abre o modal de detalhes
+                    // CLICAR NA TAREFA DO DIA FECHA O MODAL DO DIA E ABRE O MODAL DE DETALHES
                     card.addEventListener('click', () => {
-                        const bsOffcanvas = window.bootstrap?.Offcanvas?.getInstance(offcanvasDiaEl);
-                        if (bsOffcanvas) bsOffcanvas.hide();
+                        if (window.bootstrap?.Modal && document.getElementById('plannerModalDia')) {
+                            const bsModal = window.bootstrap.Modal.getInstance(document.getElementById('plannerModalDia'));
+                            if (bsModal) bsModal.hide();
+                        } else if (window.bootstrap?.Offcanvas && modalDiaEl) {
+                            const bsOffcanvas = window.bootstrap.Offcanvas.getInstance(modalDiaEl);
+                            if (bsOffcanvas) bsOffcanvas.hide();
+                        }
                         abrirDetalhesTarefa(t.id);
                     });
 
-                    // Renderiza avatares dos responsáveis
+                    // RENDERIZA AVATARES DOS RESPONSÁVEIS
                     let respsHtml = '';
                     if (Array.isArray(t.responsaveis) && t.responsaveis.length > 0) {
                         respsHtml = `<div class="avatar-stack">`;
                         t.responsaveis.slice(0, 3).forEach(uid => {
                             const u = buscarUsuario(uid);
                             if (u) {
-                                respsHtml += `<span class="avatar avatar-xs" style="background-color: ${escaparHtml(u.cor)}" title="${escaparHtml(u.nome)}">${escaparHtml(u.iniciais)}</span>`;
+                                respsHtml += renderizarAvatar(u, 'xs');
                             }
                         });
                         if (t.responsaveis.length > 3) {
@@ -1949,24 +2466,26 @@
                     card.innerHTML = `
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="planner-prio-tag ${prioMeta.classe}">${prioMeta.rotulo}</span>
-                            <span class="badge" style="background: rgba(255,255,255,0.06); color: ${coluna?.cor || '#94A3B8'}; font-size: 0.72rem;">${escaparHtml(coluna?.titulo || t.coluna_id)}</span>
+                            <span class="badge border" style="background: #F8FAFC; color: ${coluna?.cor || '#475569'}; border-color: #E2E8F0 !important; font-size: 0.72rem; font-weight: 600;">${escaparHtml(coluna?.titulo || t.coluna_id)}</span>
                         </div>
-                        <h6 class="mb-1 text-white fw-bold" style="font-size: 0.92rem;">${escaparHtml(t.titulo)}</h6>
-                        ${t.descricao ? `<p class="text-muted small mb-2" style="font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escaparHtml(t.descricao)}</p>` : ''}
-                        <div class="d-flex align-items-center justify-content-between mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.05);">
-                            <span class="text-muted small" style="font-size: 0.75rem;"><i class="bi bi-clock me-1"></i>${escaparHtml(iso)}</span>
+                        <h6 class="mb-1 fw-bold text-dark" style="font-size: 0.95rem; line-height: 1.35; color: #0F172A !important;">${escaparHtml(t.titulo)}</h6>
+                        ${t.descricao ? `<p class="text-secondary small mb-2" style="font-size: 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #475569 !important;">${escaparHtml(t.descricao)}</p>` : ''}
+                        <div class="d-flex align-items-center justify-content-between mt-2 pt-2" style="border-top: 1px solid #F1F5F9;">
+                            <span class="text-muted small" style="font-size: 0.75rem;"><i class="bi bi-clock me-1 text-primary"></i>${escaparHtml(iso)}</span>
                             ${respsHtml}
                         </div>
                     `;
 
-                    list.appendChild(card);
+                    modalDiaBody.appendChild(card);
                 });
-
-                offcanvasDiaBody.appendChild(list);
             }
 
-            if (window.bootstrap?.Offcanvas) {
-                const instance = window.bootstrap.Offcanvas.getOrCreateInstance(offcanvasDiaEl);
+            // ABERTURA VIA MODAL CENTRALIZADO (OU FALLBACK OFFCANVAS)
+            if (window.bootstrap?.Modal && document.getElementById('plannerModalDia')) {
+                const instance = window.bootstrap.Modal.getOrCreateInstance(document.getElementById('plannerModalDia'));
+                instance.show();
+            } else if (window.bootstrap?.Offcanvas && modalDiaEl) {
+                const instance = window.bootstrap.Offcanvas.getOrCreateInstance(modalDiaEl);
                 instance.show();
             }
         }
@@ -2092,7 +2611,146 @@
 
         inicializarAcordeonsAtribuicao();
 
-        // Inicialização com a view definida na URL
+        // =============================================================================
+        // § 15 · CONTROLE DE ACORDEONS FECHADOS POR PADRÃO NOS MODAIS
+        // =============================================================================
+        const modalNovaTarefaEl = document.getElementById('planner-modal-nova-tarefa');
+        if (modalNovaTarefaEl) {
+            modalNovaTarefaEl.addEventListener('show.bs.modal', () => {
+                modalNovaTarefaEl.querySelectorAll('.planner-accordion').forEach(acc => {
+                    acc.classList.remove('is-open');
+                    const btn = acc.querySelector('.planner-accordion__header');
+                    if (btn) btn.setAttribute('aria-expanded', 'false');
+                    const body = acc.querySelector('.planner-accordion__body');
+                    if (body) body.setAttribute('hidden', '');
+                });
+                atualizarResumosAcordeons();
+            });
+        }
+
+        // =============================================================================
+        // § 16 · INTERAÇÕES DA VIEW LISTA: FILTRAGEM POR ABAS, ORDENAÇÃO E DETALHES
+        // =============================================================================
+        // 1. FILTRAGEM POR ABAS RÁPIDAS NA LISTA
+        document.querySelectorAll('.planner-lista__tab[data-lista-tab]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.planner-lista__tab').forEach(t => t.classList.remove('is-active'));
+                tab.classList.add('is-active');
+                estado.filtroListaTab = tab.dataset.listaTab;
+                sincronizarFiltros();
+            });
+        });
+
+        // 2. ORDENAÇÃO INTERATIVA DE COLUNAS DA TABELA
+        let listaSortColuna = null;
+        let listaSortAsc = true;
+        document.querySelectorAll('.planner-table__th[data-sort]').forEach(th => {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', () => {
+                const campo = th.dataset.sort;
+                if (listaSortColuna === campo) {
+                    listaSortAsc = !listaSortAsc;
+                } else {
+                    listaSortColuna = campo;
+                    listaSortAsc = true;
+                }
+
+                // ATUALIZA ÍCONES NOS CABEÇALHOS
+                document.querySelectorAll('.planner-table__th[data-sort]').forEach(otherTh => {
+                    const icon = otherTh.querySelector('i');
+                    if (otherTh === th) {
+                        icon.className = listaSortAsc ? 'bi bi-arrow-up ms-1 text-warning' : 'bi bi-arrow-down ms-1 text-warning';
+                    } else if (icon) {
+                        icon.className = 'bi bi-arrow-down-up ms-1';
+                    }
+                });
+
+                // REORDENA LINHAS DO CORPO DA TABELA
+                const tbody = document.getElementById('plannerTabelaBody');
+                if (!tbody) return;
+                const rows = Array.from(tbody.querySelectorAll('.planner-table__row'));
+                rows.sort((a, b) => {
+                    const tA = estado.tarefas.find(t => t.id === Number(a.dataset.taskId));
+                    const tB = estado.tarefas.find(t => t.id === Number(b.dataset.taskId));
+                    if (!tA || !tB) return 0;
+
+                    let valA = tA[campo] || '';
+                    let valB = tB[campo] || '';
+
+                    if (campo === 'coluna') {
+                        valA = buscarColuna(tA.coluna_id)?.titulo || '';
+                        valB = buscarColuna(tB.coluna_id)?.titulo || '';
+                    }
+
+                    if (typeof valA === 'string') {
+                        return listaSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    }
+                    return listaSortAsc ? (valA - valB) : (valB - valA);
+                });
+
+                rows.forEach(r => tbody.appendChild(r));
+                const emptyRow = document.getElementById('plannerTabelaEmptyRow');
+                if (emptyRow) tbody.appendChild(emptyRow);
+            });
+        });
+
+        // 3. CLIQUE NA LINHA DA LISTA PARA ABRIR DETALHES
+        const tabelaBody = document.getElementById('plannerTabelaBody');
+        if (tabelaBody) {
+            tabelaBody.addEventListener('click', e => {
+                // Não abre detalhes se clicou no botão de mover ou excluir
+                if (e.target.closest('[data-action="mover"]') || e.target.closest('[data-action="excluir-tarefa"]')) return;
+                const row = e.target.closest('.planner-table__row');
+                if (!row) return;
+                const taskId = Number(row.dataset.taskId);
+                if (taskId) {
+                    abrirDetalhesTarefa(taskId);
+                }
+            });
+        }
+
+        // =============================================================================
+        // § 17 · SINCRONIZAÇÃO DE FEEDBACK VISUAL EM TODOS OS PICKERS DE RESPONSÁVEIS
+        // =============================================================================
+        document.addEventListener('change', e => {
+            const cb = e.target.closest('.planner-assignee-option input[type="checkbox"]');
+            if (!cb) return;
+            const opt = cb.closest('.planner-assignee-option');
+            if (opt) {
+                opt.classList.toggle('is-selected', cb.checked);
+            }
+        });
+
+        // =============================================================================
+        // § 18 · DELEGAÇÃO DE CLIQUES PARA O CALENDÁRIO (DIAS GERADOS VIA PHP OU JS)
+        // =============================================================================
+        const calendarGrid = document.getElementById('plannerCalendarGrid');
+        if (calendarGrid) {
+            calendarGrid.addEventListener('click', e => {
+                const dayBtn = e.target.closest('.cal-day[data-date]');
+                if (dayBtn && !dayBtn.classList.contains('is-empty')) {
+                    const iso = dayBtn.dataset.date;
+                    if (iso) {
+                        abrirDetalhesDia(iso);
+                    }
+                }
+            });
+        }
+
+        // =============================================================================
+        // § 19 · INICIALIZAÇÃO DE TOOLTIPS DO BOOTSTRAP EM ELEMENTOS COM DATA-BS-TOGGLE
+        // =============================================================================
+        function inicializarTooltips() {
+            if (window.bootstrap?.Tooltip) {
+                const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+                tooltipTriggerList.forEach(el => {
+                    window.bootstrap.Tooltip.getOrCreateInstance(el);
+                });
+            }
+        }
+        inicializarTooltips();
+
+        // INICIALIZAÇÃO COM A VIEW DEFINIDA NA URL OU PADRÃO
         const urlParams = new URLSearchParams(window.location.search);
         const initialView = urlParams.get('view') || estado.visaoAtual || 'kanban';
         trocarVisao(initialView, false);

@@ -766,12 +766,13 @@ button {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
     border-radius: 10px;
-    padding: 0.45rem 0.85rem;
+    padding: 0.55rem 0.85rem;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
     overflow: visible !important;
+    transition: all var(--planner-t);
 }
 
 .planner-topbar {
@@ -782,11 +783,50 @@ button {
     display: flex;
     align-items: center;
     gap: 0.55rem;
-    flex-wrap: nowrap !important;
-    white-space: nowrap;
+    flex-wrap: wrap;
     width: 100%;
     margin: 0 auto;
     overflow: visible !important;
+}
+
+@media (max-width: 1200px) {
+    .planner-filtros-centered {
+        gap: 0.45rem;
+    }
+    .planner-filtros__search-wrap {
+        flex: 1 1 200px;
+    }
+    .planner-filtros__input {
+        width: 100%;
+        min-width: 160px;
+    }
+}
+
+@media (max-width: 768px) {
+    .planner-filtros-centered {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    .planner-filtros__search-wrap,
+    .planner-multiselect,
+    .planner-date-range,
+    .planner-filtros__clear {
+        width: 100%;
+    }
+    .planner-multiselect__btn {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .planner-multiselect__dropdown {
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        min-width: unset !important;
+    }
+    .planner-date-range {
+        justify-content: space-between;
+    }
 }
 
 .planner-filtros__search-wrap {
@@ -1345,6 +1385,46 @@ button {
     border-color: #CBD5E1;
 }
 
+/* DESTAQUE DE TAREFAS ATRASADAS (VERMELHO CLARO DESTACADO) */
+.task-card.sp-atrasada,
+.task-card.is-atrasada {
+    background: #FEF2F2 !important;
+    border-color: #FCA5A5 !important;
+    box-shadow: 0 1px 4px rgba(239, 68, 68, 0.12) !important;
+}
+
+.task-card.sp-atrasada::before,
+.task-card.is-atrasada::before {
+    background: #EF4444 !important;
+    width: 4px !important;
+}
+
+.task-card.sp-atrasada:hover,
+.task-card.is-atrasada:hover {
+    border-color: #EF4444 !important;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.18) !important;
+}
+
+/* DESTAQUE EM LINHA DA TABELA DE LISTA PARA ATRASADAS */
+.planner-table__row.sp-atrasada {
+    background: rgba(254, 242, 242, 0.85) !important;
+    border-left: 3px solid #EF4444;
+}
+
+.planner-table__row.sp-atrasada:hover {
+    background: #FEE2E2 !important;
+}
+
+/* DESTAQUE EM CARDS DE MINHAS TAREFAS ATRASADAS */
+.planner-minhas__card.sp-atrasada {
+    background: #FEF2F2 !important;
+    border-color: #FCA5A5 !important;
+}
+
+.planner-minhas__card.sp-atrasada::before {
+    background: #EF4444 !important;
+}
+
 .task-card.is-dragging {
     opacity: 0.35;
     cursor: grabbing;
@@ -1686,17 +1766,18 @@ button {
 }
 
 .planner-cal-task-card {
-    background: var(--planner-surface-2);
-    border: 1px solid var(--planner-border);
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
     border-radius: var(--planner-radius-sm);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
     cursor: pointer;
     transition: all var(--planner-t);
 }
 
 .planner-cal-task-card:hover {
-    border-color: var(--planner-gold);
+    border-color: #10B981 !important;
     transform: translateY(-2px);
-    box-shadow: var(--planner-shadow-sm);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 
 /* § 10 · VIEW 3: DASHBOARD (.planner-dashboard) */
@@ -1870,76 +1951,100 @@ button {
 
 .planner-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     text-align: left;
 }
 
 .planner-table__th {
-    padding: 0.85rem 1rem;
-    font-size: 0.74rem;
+    padding: 0.95rem 1.15rem;
+    font-size: 0.76rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--planner-text-3);
-    border-bottom: 1px solid var(--planner-border);
+    color: #475569;
+    background: #F8FAFC;
+    border-bottom: 2px solid #E2E8F0;
+    user-select: none;
+}
+
+.planner-table__th:first-child {
+    border-top-left-radius: 8px;
+}
+
+.planner-table__th:last-child {
+    border-top-right-radius: 8px;
 }
 
 .planner-table__row {
-    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-    transition: background var(--planner-t);
+    border-bottom: 1px solid #F1F5F9;
+    transition: all 0.15s ease-in-out;
 }
 
 .planner-table__row:hover {
-    background: var(--planner-surface-2);
+    background: #F8FAFC;
+    box-shadow: inset 0 0 0 1px #E2E8F0;
 }
 
 .planner-table__td {
-    padding: 0.95rem 1rem;
+    padding: 1rem 1.15rem;
     font-size: 0.86rem;
-    color: var(--planner-text);
+    color: #1E293B;
     vertical-align: middle;
+    border-bottom: 1px solid #F1F5F9;
 }
 
 .planner-table__title-btn {
     background: none;
     border: none;
     padding: 0;
-    color: var(--planner-text);
+    color: #0F172A;
     font-weight: 600;
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     text-align: left;
     cursor: pointer;
     transition: color var(--planner-t);
 }
 
 .planner-table__title-btn:hover {
-    color: #059669;
+    color: #10B981;
+    text-decoration: underline;
 }
 
 .planner-table__td--actions {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
 }
 
 .planner-btn-icon-sm {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 6px;
-    background: var(--planner-surface-2);
-    border: 1px solid var(--planner-border);
-    color: var(--planner-text-2);
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    color: #475569;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
+    font-size: 0.82rem;
     transition: all var(--planner-t);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .planner-btn-icon-sm:hover {
-    background: var(--planner-primary);
-    color: #fff;
-    border-color: var(--planner-primary);
+    background: #10B981;
+    color: #ffffff;
+    border-color: #10B981;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.25);
+}
+
+.planner-btn-icon-sm.text-danger:hover {
+    background: #EF4444 !important;
+    color: #ffffff !important;
+    border-color: #EF4444 !important;
+    box-shadow: 0 2px 5px rgba(239, 68, 68, 0.25);
 }
 
 .planner-table__empty {
@@ -1950,11 +2055,12 @@ button {
 }
 
 .planner-status-dot {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     display: inline-block;
     margin-right: 6px;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
 }
 
 /* § 12 · VIEW 5: MINHAS TAREFAS (.planner-minhas) */
@@ -2377,18 +2483,45 @@ button {
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    padding: 0.45rem 0.65rem;
-    border-radius: var(--planner-radius-xs);
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--planner-radius-sm);
     cursor: pointer;
-    transition: background var(--planner-t);
+    border: 1px solid transparent;
+    background: transparent;
+    transition: all var(--planner-t);
+    position: relative;
+    user-select: none;
 }
 
 .planner-assignee-option:hover {
     background: var(--planner-surface-3);
+    border-color: var(--planner-border);
 }
 
-.planner-assignee-option.is-selected {
-    background: rgba(5, 150, 105, 0.12);
+/* INDICADOR EXPLÍCITO DE SELEÇÃO */
+.planner-assignee-option::before {
+    content: '';
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #CBD5E1;
+    background: #FFFFFF;
+    flex-shrink: 0;
+    transition: all var(--planner-t);
+}
+
+/* QUANDO SELECIONADO: BORDA VERDE, FUNDO DESTACADO E ÍCONE DE CHECK */
+.planner-assignee-option.is-selected,
+.planner-assignee-option:has(input:checked) {
+    background: rgba(16, 185, 129, 0.12) !important;
+    border-color: #10B981 !important;
+}
+
+.planner-assignee-option.is-selected::before,
+.planner-assignee-option:has(input:checked)::before {
+    background: #10B981 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ffffff'%3E%3Cpath d='M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z'/%3E%3C/svg%3E") no-repeat center center / 12px 12px;
+    border-color: #10B981;
 }
 
 .planner-assignee-option__nome {
@@ -3057,4 +3190,281 @@ button {
 .planner-removable-badge__del:hover {
     color: #ef4444;
     background: rgba(239, 68, 68, 0.15);
+}
+
+/* § 14 · AVATARES COM FOTO DO USUÁRIO */
+img.avatar,
+.avatar img {
+    object-fit: cover;
+    border-radius: 50%;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* § 15 · MÓDULO GLOBAL DE NOTIFICAÇÕES (TOAST SYSTEM) */
+.planner-toast-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 380px;
+    width: calc(100vw - 32px);
+    pointer-events: none;
+}
+
+.planner-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #FFFFFF;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    border: 1px solid #E2E8F0;
+    border-left-width: 4px;
+    animation: plannerToastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.planner-toast.is-leaving {
+    animation: plannerToastOut 0.25s ease forwards;
+}
+
+@keyframes plannerToastIn {
+    from {
+        opacity: 0;
+        transform: translateX(40px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@keyframes plannerToastOut {
+    from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(30px) scale(0.92);
+    }
+}
+
+.planner-toast__icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: 2px;
+}
+
+.planner-toast__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.planner-toast__title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #0F172A;
+    margin-bottom: 2px;
+}
+
+.planner-toast__message {
+    font-size: 0.82rem;
+    color: #475569;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.planner-toast__close {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: -2px -2px 0 0;
+    color: #94A3B8;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.planner-toast__close:hover {
+    color: #0F172A;
+    background: #F1F5F9;
+}
+
+/* Variações de Toast */
+.planner-toast--sucesso {
+    border-left-color: #16A34A;
+}
+.planner-toast--sucesso .planner-toast__icon {
+    color: #16A34A;
+}
+
+.planner-toast--erro {
+    border-left-color: #DC2626;
+}
+.planner-toast--erro .planner-toast__icon {
+    color: #DC2626;
+}
+
+.planner-toast--aviso {
+    border-left-color: #D97706;
+}
+.planner-toast--aviso .planner-toast__icon {
+    color: #D97706;
+}
+
+.planner-toast--info {
+    border-left-color: #2563EB;
+}
+.planner-toast--info .planner-toast__icon {
+    color: #2563EB;
+}
+
+/* § 16 · ESTADOS VAZIOS (EMPTY STATES) */
+.planner-empty-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 16px;
+    border: 2px dashed var(--planner-border);
+    border-radius: var(--planner-radius);
+    color: var(--planner-text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin: 8px 0;
+    user-select: none;
+    transition: border-color var(--planner-t);
+}
+
+.planner-empty-column i {
+    font-size: 1.8rem;
+    opacity: 0.6;
+}
+
+.planner-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 48px 24px;
+    background: var(--planner-surface);
+    border: 1px solid var(--planner-border);
+    border-radius: var(--planner-radius-lg);
+    box-shadow: var(--planner-shadow-sm);
+    margin: 20px 0;
+}
+
+/* § 17 · ABAS E RECURSOS DA VISUALIZAÇÃO EM LISTA */
+.planner-lista__tabs {
+    display: inline-flex;
+    gap: 6px;
+    background: var(--planner-bg-2);
+    padding: 4px;
+    border-radius: var(--planner-radius);
+    border: 1px solid var(--planner-border);
+    flex-wrap: wrap;
+}
+
+.planner-lista__tab {
+    background: transparent;
+    border: none;
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--planner-text-2);
+    border-radius: var(--planner-radius-sm);
+    cursor: pointer;
+    transition: all var(--planner-t);
+}
+
+.planner-lista__tab:hover {
+    color: var(--planner-text);
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.planner-lista__tab.is-active {
+    background: var(--planner-surface);
+    color: var(--planner-primary);
+    box-shadow: var(--planner-shadow-sm);
+}
+
+/* § 18 · BADGE DE LÍDER DA EQUIPE */
+.planner-team-leader-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #CA8A04;
+    background: rgba(234, 179, 8, 0.12);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+}
+
+/* § 19 · RESPONSIVIDADE APRIMORADA DOS GRÁFICOS DO DASHBOARD */
+@media (max-width: 991px) {
+    .planner-charts {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* § 20 · SPINNER PEQUENO INTERNO AOS MODAIS (NÃO GLOBAL) */
+.modal-backdrop.show {
+    opacity: 0.28 !important;
+}
+
+.planner-modal-inline-spinner {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #10B981;
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    animation: plannerSpinnerFadeIn 0.2s ease-out;
+}
+
+.planner-modal-inline-spinner .spinner-border {
+    width: 0.95rem;
+    height: 0.95rem;
+    border-width: 0.14em;
+    color: #10B981 !important;
+}
+
+@keyframes plannerSpinnerFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* § 21 · MODAL DE CONFIRMAÇÃO ESTILIZADO */
+.planner-confirm-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
 }

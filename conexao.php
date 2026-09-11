@@ -54,3 +54,5 @@ try {
 } catch (Throwable) {
     $conn = null;
 }
+
+$GLOBALS['conn'] = $conn;

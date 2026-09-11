@@ -28,9 +28,11 @@ match($action) {
     'atualizar_responsaveis'   => plannerActionAtualizarResponsaveis($body, $usuarioAtual),
     'atualizar_pessoas_soltas' => plannerActionAtualizarPessoasSoltas($body, $usuarioAtual),
     'obter_comentarios'        => plannerActionObterComentarios($body, $usuarioAtual),
+    'obter_atividades'         => plannerActionObterAtividades($body, $usuarioAtual),
     'criar_comentario'         => plannerActionCriarComentario($body, $usuarioAtual),
     'editar_comentario'      => plannerActionEditarComentario($body, $usuarioAtual),
     'excluir_comentario'     => plannerActionExcluirComentario($body, $usuarioAtual),
+    'excluir_tarefa'         => plannerActionExcluirTarefa($body, $usuarioAtual),
     default                  => plannerError("Ação desconhecida: {$action}", 400),
 };
 
